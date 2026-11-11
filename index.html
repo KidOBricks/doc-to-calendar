@@ -498,28 +498,76 @@
       const isAllDayDefault = document.getElementById('all-day-checkbox').checked;
       const defaultTime = isAllDayDefault ? null : (document.getElementById('default-time').value || "18:00");
       const scope = document.getElementById('scope-select').value;
+      const isWixHost = window.location.hostname.includes('zyfn.com') || window.location.hostname.includes('wixsite.com');
       const apiKey = localStorage.getItem('gemini_api_key') || document.getElementById('gemini-api-key').value.trim();
 
-      // If API key is available, call Gemini API for advanced semantic understanding
-      if (apiKey) {
-        document.getElementById('extract-btn').innerHTML = "<span>🤖 AI Analyzing...</span>";
-        document.getElementById('extract-btn').disabled = true;
-        try {
+      document.getElementById('extract-btn').innerHTML = "<span>🤖 AI Analyzing...</span>";
+      document.getElementById('extract-btn').disabled = true;
+
+      try {
+        if (isWixHost) {
+          // Attempt Wix Backend call first (uses your secured GEMINI_API_KEY from Secrets Manager)
+          extractedEvents = await callWixBackendExtraction(text, shortCode, catStyle, defaultTime, isAllDayDefault);
+        } else if (apiKey) {
+          // Attempt direct client-side Gemini API call with key
           extractedEvents = await callGeminiExtraction(text, apiKey, shortCode, catStyle, defaultTime, isAllDayDefault);
-        } catch (err) {
-          console.warn("AI extraction fallback to rule-based parser:", err);
+        } else {
+          // Offline rule-based parser
           extractedEvents = parseDocumentEvents(text, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
-        } finally {
-          document.getElementById('extract-btn').innerHTML = "<span>✨ Extract & Build Calendar</span>";
-          document.getElementById('extract-btn').disabled = false;
         }
-      } else {
+      } catch (err) {
+        console.warn("AI extraction fallback to rule-based parser:", err);
         extractedEvents = parseDocumentEvents(text, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
+      } finally {
+        document.getElementById('extract-btn').innerHTML = "<span>✨ Extract & Build Calendar</span>";
+        document.getElementById('extract-btn').disabled = false;
       }
 
       renderTable();
       document.getElementById('results-section').classList.remove('hidden');
       document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Call Wix Backend HTTP function (securely uses GEMINI_API_KEY from Wix Secrets Manager)
+    async function callWixBackendExtraction(text, code, catStyle, defaultTime, isAllDay) {
+      const prompt = `Extract all calendar events, deadlines, meetings, travel, flights, holidays, and milestones from this document into a valid JSON array of objects.
+Each object must have:
+- title: string (format as ${code ? code + ' - ' : ''}[CATEGORY] - Event Title)
+- date: YYYY-MM-DD
+- startTime: HH:MM or null if all-day
+- endTime: HH:MM or null
+- isAllDay: boolean
+- category: DDL / MEET / EVT / FLIGHT / HOL / MILE
+- location: string
+- description: string (rich context, details, requirements)
+
+Document text:
+${text.substring(0, 15000)}
+
+Respond with JSON only, matching [{title, date, startTime, endTime, isAllDay, category, location, description}].`;
+
+      const res = await fetch('/_functions/extractCalendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: prompt })
+      });
+
+      if (!res.ok) throw new Error("Wix backend returned " + res.status);
+      const data = await res.json();
+      const rawText = data.candidates ? data.candidates[0].content.parts[0].text : (typeof data === 'string' ? data : JSON.stringify(data));
+      const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleanJson);
+      return parsed.map(item => ({
+        id: 'ev_' + Math.random().toString(36).substr(2, 9),
+        title: item.title,
+        date: item.date,
+        startTime: item.startTime || (isAllDay ? "" : (defaultTime || "18:00")),
+        endTime: item.endTime || item.startTime || (isAllDay ? "" : (defaultTime || "18:00")),
+        isAllDay: item.isAllDay || isAllDay,
+        category: item.category || 'EVT',
+        location: item.location || '',
+        description: item.description || ''
+      }));
     }
 
     // Gemini API Direct Client-side Call
