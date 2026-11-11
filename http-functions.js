@@ -7,48 +7,83 @@ export async function post_extractCalendar(request) {
     const body = await request.body.json();
     const apiKey = await getSecret('GEMINI_API_KEY');
 
-    // List of model candidates in order of preference
-    const models = ['gemini-3.8-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
-    let lastError = null;
-
-    for (const model of models) {
-      try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const response = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: body.prompt }] }],
-            generationConfig: {
-              responseMimeType: "application/json",
-              temperature: 0.1
-            }
-          })
-        });
-
-        const data = await response.json();
-        if (response.ok && !data.error && data.candidates && data.candidates[0]) {
-          return ok({
-            headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*'
-            },
-            body: data
-          });
+    // Build multimodal parts: attach base64 file data if available
+    const parts = [];
+    if (body.fileBase64 && body.mimeType) {
+      parts.push({
+        inlineData: {
+          mimeType: body.mimeType,
+          data: body.fileBase64
         }
-        lastError = data.error || { message: `Model ${model} returned status ${response.status}` };
-      } catch (e) {
-        lastError = e;
+      });
+    }
+
+    const docText = body.text ? `\n\nDocument Content:\n${body.text.substring(0, 30000)}` : '';
+    parts.push({ text: (body.prompt || 'Extract all calendar events into a JSON array of objects.') + docText });
+
+    // Primary Call: Gemini 3.8 Flash
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+
+    const response = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: parts }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.1
+        }
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok && !data.error && data.candidates && data.candidates[0]) {
+      return ok({
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: data
+      });
+    }
+
+    // Fallback: If generateContent requested Interactions API
+    if (data.error && (data.error.code === 404 || (data.error.message && data.error.message.includes('Interactions')))) {
+      const interactionsUrl = `https://generativelanguage.googleapis.com/v1beta/interactions?key=${apiKey}`;
+      const intResponse = await fetch(interactionsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Api-Revision': '2026-05-20'
+        },
+        body: JSON.stringify({
+          model: 'gemini-3.8-flash',
+          input: body.prompt + docText,
+          generation_config: {
+            temperature: 0.1
+          }
+        })
+      });
+
+      const intData = await intResponse.json();
+      if (intResponse.ok && !intData.error) {
+        return ok({
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          },
+          body: intData
+        });
       }
     }
 
-    // If all models failed, return server error with details so frontend can fall back to local parser
     return serverError({
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: { error: lastError }
+      body: { error: data.error || { message: `Gemini status ${response.status}` } }
     });
   } catch (err) {
     return serverError({
@@ -61,7 +96,6 @@ export async function post_extractCalendar(request) {
   }
 }
 
-// CORS Preflight handler
 export function options_extractCalendar(request) {
   return ok({
     headers: {

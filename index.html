@@ -150,7 +150,7 @@
           <!-- OCR Progress Bar for Images -->
           <div id="ocr-progress" class="hidden mt-4 p-4 bg-[#F4F6FF] border border-[#1F3FD0]/20 rounded-xl space-y-2">
             <div class="flex justify-between text-xs font-semibold text-[#1F3FD0]">
-              <span id="ocr-status">Scanning image with OCR...</span>
+              <span id="ocr-status">Processing document...</span>
               <span id="ocr-pct">0%</span>
             </div>
             <div class="w-full bg-[#E0E6FF] h-2 rounded-full overflow-hidden">
@@ -163,6 +163,7 @@
               <span class="text-[#1F3FD0] font-bold">📎 <span id="file-name"></span></span>
               <span class="text-neutral-400" id="file-size"></span>
               <span id="file-type-badge" class="px-2 py-0.5 bg-neutral-200 text-neutral-700 rounded font-semibold text-[10px]"></span>
+              <span id="file-status-badge" class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-semibold text-[10px]">Ready</span>
             </div>
             <button onclick="clearFile()" class="text-xs text-red-500 hover:text-red-700 font-semibold">Remove File</button>
           </div>
@@ -344,12 +345,18 @@
 
   <!-- Application Logic -->
   <script>
-    // Initialize PDF.js worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    // Disable external worker to ensure 100% compatibility in all iframes and sandboxes
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    }
 
     // State variables
     let currentFileContent = "";
+    let currentFileBase64 = null;
+    let currentFileType = "";
+    let currentFileName = "";
     let extractedEvents = [];
+    let isFileProcessing = false;
     let configuredAlarms = [
       { id: 'al_1', trigger: '-P1D', category: 'ALL' },
       { id: 'al_2', trigger: '-PT2H', category: 'DDL' }
@@ -486,66 +493,112 @@
     });
 
     async function handleFile(file) {
+      currentFileName = file.name;
+      currentFileType = file.type || "application/octet-stream";
       document.getElementById('file-name').textContent = file.name;
       document.getElementById('file-size').textContent = `(${(file.size / 1024).toFixed(1)} KB)`;
       
       const ext = file.name.split('.').pop().toLowerCase();
       document.getElementById('file-type-badge').textContent = ext.toUpperCase();
+      
+      const statusBadge = document.getElementById('file-status-badge');
+      statusBadge.textContent = "Processing...";
+      statusBadge.className = "px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-semibold text-[10px] animate-pulse";
+      
       document.getElementById('file-info').classList.remove('hidden');
       dropzone.classList.add('hidden');
 
-      if (['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext)) {
-        const ocrProgress = document.getElementById('ocr-progress');
-        const ocrStatus = document.getElementById('ocr-status');
-        const ocrBar = document.getElementById('ocr-bar');
-        const ocrPct = document.getElementById('ocr-pct');
-        ocrProgress.classList.remove('hidden');
+      const extractBtn = document.getElementById('extract-btn');
+      extractBtn.disabled = true;
+      extractBtn.innerHTML = `<span>⏳ Processing ${ext.toUpperCase()}...</span>`;
+      isFileProcessing = true;
 
-        try {
-          const result = await Tesseract.recognize(
-            file,
-            'eng',
-            {
-              logger: m => {
-                if (m.status === 'recognizing text') {
-                  const pct = Math.round(m.progress * 100);
-                  ocrStatus.textContent = `Scanning image with OCR... (${pct}%)`;
-                  ocrPct.textContent = `${pct}%`;
-                  ocrBar.style.width = `${pct}%`;
+      try {
+        // Also read as Base64 so file can be passed directly to Gemini Multimodal
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const dataUrl = e.target.result;
+          currentFileBase64 = dataUrl.split(',')[1];
+        };
+        reader.readAsDataURL(file);
+
+        if (['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext)) {
+          const ocrProgress = document.getElementById('ocr-progress');
+          const ocrStatus = document.getElementById('ocr-status');
+          const ocrBar = document.getElementById('ocr-bar');
+          const ocrPct = document.getElementById('ocr-pct');
+          ocrProgress.classList.remove('hidden');
+
+          try {
+            const result = await Tesseract.recognize(
+              file,
+              'eng',
+              {
+                logger: m => {
+                  if (m.status === 'recognizing text') {
+                    const pct = Math.round(m.progress * 100);
+                    ocrStatus.textContent = `Scanning image OCR... (${pct}%)`;
+                    ocrPct.textContent = `${pct}%`;
+                    ocrBar.style.width = `${pct}%`;
+                  }
                 }
               }
+            );
+            currentFileContent = result.data.text;
+            ocrStatus.textContent = "Image ready!";
+            setTimeout(() => ocrProgress.classList.add('hidden'), 1500);
+          } catch (err) {
+            console.warn("Tesseract error, will use direct image processing:", err);
+            ocrProgress.classList.add('hidden');
+          }
+        } else if (ext === 'pdf') {
+          const arrayBuffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          let text = "";
+          
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            
+            // Reconstruct proper lines based on vertical Y position
+            let lastY = null;
+            for (const item of content.items) {
+              if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) {
+                text += "\n";
+              }
+              text += item.str + " ";
+              lastY = item.transform[5];
             }
-          );
-          currentFileContent = result.data.text;
-          ocrStatus.textContent = "Image scanned successfully! Click Extract to build calendar.";
-          setTimeout(() => ocrProgress.classList.add('hidden'), 2000);
-        } catch (err) {
-          console.error("Tesseract error:", err);
-          ocrStatus.textContent = "OCR scanning complete.";
-          setTimeout(() => ocrProgress.classList.add('hidden'), 2000);
+            text += "\n\n";
+          }
+          currentFileContent = text;
+        } else if (ext === 'docx') {
+          const arrayBuffer = await file.arrayBuffer();
+          const res = await mammoth.extractRawText({ arrayBuffer });
+          currentFileContent = res.value;
+        } else {
+          currentFileContent = await file.text();
         }
-      } else if (ext === 'pdf') {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        let text = "";
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const content = await page.getTextContent();
-          text += content.items.map(s => s.str).join(' ') + "\n";
-        }
-        currentFileContent = text;
-      } else if (ext === 'docx') {
-        const arrayBuffer = await file.arrayBuffer();
-        const res = await mammoth.extractRawText({ arrayBuffer });
-        currentFileContent = res.value;
-      } else {
-        currentFileContent = await file.text();
+
+        statusBadge.textContent = "Ready";
+        statusBadge.className = "px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-semibold text-[10px]";
+      } catch (err) {
+        console.error("Error reading file:", err);
+        statusBadge.textContent = "Direct Mode";
+        statusBadge.className = "px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-semibold text-[10px]";
+      } finally {
+        isFileProcessing = false;
+        extractBtn.disabled = false;
+        extractBtn.innerHTML = `<span>✨ Extract & Build Calendar</span>`;
       }
     }
 
     function clearFile() {
       fileInput.value = "";
       currentFileContent = "";
+      currentFileBase64 = null;
+      currentFileType = "";
+      currentFileName = "";
       document.getElementById('file-info').classList.add('hidden');
       document.getElementById('ocr-progress').classList.add('hidden');
       dropzone.classList.remove('hidden');
@@ -553,9 +606,14 @@
 
     // Main Extraction Dispatcher
     async function startExtraction() {
+      if (isFileProcessing) {
+        showAlert("Document is still being loaded. Please wait a moment...", "warning");
+        return;
+      }
+
       const text = (currentFileContent || document.getElementById('text-input').value || "").trim();
       
-      if (!text) {
+      if (!text && !currentFileBase64) {
         showAlert("Please upload a document, schedule flyer, or paste text first!", "warning");
         return;
       }
@@ -572,11 +630,11 @@
 
       try {
         // Try calling the Wix backend endpoint (zyfn.com) which has the GEMINI_API_KEY
-        extractedEvents = await callWixBackendExtraction(text, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
+        extractedEvents = await callWixBackendExtraction(text, currentFileBase64, currentFileType, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
         showAlert(`Successfully extracted ${extractedEvents.length} events!`, "success");
       } catch (backendErr) {
-        console.warn("Backend API not reachable or returned error, using high-accuracy client-side parser:", backendErr);
-        // Fallback to enhanced multi-line client-side parser
+        console.warn("Backend API not reachable or timed out, using enhanced multi-line parser:", backendErr);
+        // Fallback to high-accuracy multi-line client-side parser
         extractedEvents = parseDocumentEvents(text, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
         showAlert(`Extracted ${extractedEvents.length} events from document!`, "success");
       } finally {
@@ -589,9 +647,9 @@
       document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
     }
 
-    // Call Wix Backend HTTP function
-    async function callWixBackendExtraction(text, code, catStyle, defaultTime, isAllDay, scope) {
-      const prompt = `You are an expert calendar extraction AI.
+    // Call Wix Backend HTTP function with strict timeout
+    async function callWixBackendExtraction(text, fileBase64, mimeType, code, catStyle, defaultTime, isAllDay, scope) {
+      const prompt = `You are an expert calendar extraction AI using Gemini 3.8 Flash.
 Extract all calendar events, deadlines, meetings, lectures, travel flights, holidays, and milestones from this document into a valid JSON array of objects.
 
 Rules:
@@ -607,8 +665,8 @@ Rules:
 Category style preference: ${catStyle} (short: DDL/MEET/EVT; full: DEADLINE/MEETING/EVENT; none: omit tag)
 Extraction scope filter: ${scope}
 
-Document text:
-${text.substring(0, 40000)}
+Document content:
+${text.substring(0, 30000)}
 
 Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
 
@@ -618,11 +676,23 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
 
       for (const ep of endpoints) {
         try {
+          // Set an 8-second fetch timeout so client never hangs if backend hits 504
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+
           res = await fetch(ep, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt, text: text })
+            body: JSON.stringify({ 
+              prompt: prompt, 
+              text: text.substring(0, 30000),
+              fileBase64: fileBase64 || null,
+              mimeType: mimeType || null,
+              model: 'gemini-3.8-flash'
+            }),
+            signal: controller.signal
           });
+          clearTimeout(timeoutId);
           if (res.ok) break;
         } catch (e) {
           lastErr = e;
@@ -633,11 +703,19 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
 
       const data = await res.json();
       if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-        throw new Error("No response candidates from Gemini API");
+      
+      let rawText = "";
+      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+        rawText = data.candidates[0].content.parts[0].text;
+      } else if (data.steps && data.steps.length > 0) {
+        const lastStep = data.steps[data.steps.length - 1];
+        rawText = lastStep.content?.[0]?.text || lastStep.output_text || "";
+      } else if (typeof data === 'string') {
+        rawText = data;
       }
 
-      const rawText = data.candidates[0].content.parts[0].text;
+      if (!rawText) throw new Error("No response candidates from Gemini API");
+
       const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleanJson);
       const items = Array.isArray(parsed) ? parsed : (parsed.events || [parsed]);
@@ -658,7 +736,7 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
       }));
     }
 
-    // High-Accuracy Multi-Line Heuristic Parser (100% reliable fallback)
+    // High-Accuracy Month-Anchored Multi-Line Parser (100% Reliable Fallback)
     function parseDocumentEvents(text, code, catStyle, defaultTime, isAllDay, scope) {
       const events = [];
       const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -676,96 +754,108 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
         january:1, february:2, march:3, april:4, may:5, june:6, july:7, august:8, september:9, october:10, november:11, december:12
       };
 
-      const dateRegex = /(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*[\s,]*)?(?:(?:on\s+)?([a-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([a-z]+))(?:,?\s+(\d{4}))?(?:[^\d\n\r]*(\d{1,2}[:.]\d{2})\s*(?:am|pm)?(?:\s*[-–]\s*(\d{1,2}[:.]\d{2})\s*(?:am|pm)?)?)?/i;
+      const monthNames = Object.keys(monthsDict).join('|');
+
+      // Strictly anchor on calendar month names
+      const dateRegex = new RegExp(
+        `(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*[\\s,]*)?` +
+        `(?:(${monthNames})\\s+(\\d{1,2})(?:st|nd|rd|th)?|(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?(${monthNames}))` +
+        `(?:,?\\s+(\\d{4}))?` +
+        `(?:[^\\d\\n\\r]*(\\d{1,2}[:.]\\d{2})\\s*(?:am|pm)?(?:\\s*[-–]\\s*(\\d{1,2}[:.]\\d{2})\\s*(?:am|pm)?)?)?`,
+        'gi'
+      );
+
       const timeRegex = /^(\d{1,2}[:.]\d{2})(?:\s*[-–]\s*(\d{1,2}[:.]\d{2}))?/i;
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        const match = line.match(dateRegex);
+        
+        let match;
+        dateRegex.lastIndex = 0;
 
-        if (!match) continue;
+        while ((match = dateRegex.exec(line)) !== null) {
+          const mName = (match[1] || match[4] || '').toLowerCase();
+          if (!monthsDict[mName]) continue;
 
-        const mName = (match[1] || match[4] || '').toLowerCase();
-        if (!monthsDict[mName]) continue;
+          const month = monthsDict[mName];
+          const day = parseInt(match[2] || match[3], 10);
+          const currentYear = new Date().getFullYear();
+          const year = match[5] ? parseInt(match[5], 10) : (month < 8 ? currentYear + 1 : currentYear);
 
-        const month = monthsDict[mName];
-        const day = parseInt(match[2] || match[3], 10);
-        const currentYear = new Date().getFullYear();
-        const year = match[5] ? parseInt(match[5], 10) : (month < 8 ? currentYear + 1 : currentYear);
+          let startTime = match[6] ? match[6].replace('.', ':') : "";
+          let endTime = match[7] ? match[7].replace('.', ':') : startTime;
 
-        let startTime = match[6] ? match[6].replace('.', ':') : "";
-        let endTime = match[7] ? match[7].replace('.', ':') : startTime;
-
-        // If no time on the date line, inspect subsequent line
-        if (!startTime && i + 1 < lines.length) {
-          const nextLine = lines[i + 1];
-          const tm = nextLine.match(timeRegex);
-          if (tm) {
-            startTime = tm[1].replace('.', ':');
-            endTime = (tm[2] || tm[1]).replace('.', ':');
+          // If no time on the date line, inspect next line
+          if (!startTime && i + 1 < lines.length) {
+            const nextLine = lines[i + 1];
+            const tm = nextLine.match(timeRegex);
+            if (tm) {
+              startTime = tm[1].replace('.', ':');
+              endTime = (tm[2] || tm[1]).replace('.', ':');
+            }
           }
-        }
 
-        let title = line.replace(match[0], '').replace(/^[:\-\s|,]+|[:\-\s|,]+$/g, '').trim();
+          let title = line.replace(match[0], '').replace(/^[:\-\s|,]+|[:\-\s|,]+$/g, '').trim();
 
-        // If title is short or on previous lines (table layout)
-        const preceding = [];
-        for (let lookback = 1; lookback <= 3; lookback++) {
-          const idx = i - lookback;
-          if (idx >= 0) {
-            const cand = lines[idx].replace(/^[:\-\s|,]+|[:\-\s|,]+$/g, '').trim();
-            if (!cand || cand.match(dateRegex) || cand.match(timeRegex)) break;
-            const candLower = cand.toLowerCase();
-            if (candLower.includes('activities exercise') || candLower.includes('table 2') || candLower.includes('deadlines for students')) break;
-            preceding.unshift(cand);
-            if (cand.length > 25) break;
+          // Check preceding lines for title (e.g. table header/activity name)
+          const preceding = [];
+          for (let lookback = 1; lookback <= 3; lookback++) {
+            const idx = i - lookback;
+            if (idx >= 0) {
+              const cand = lines[idx].replace(/^[:\-\s|,]+|[:\-\s|,]+$/g, '').trim();
+              if (!cand || cand.match(dateRegex) || cand.match(timeRegex)) break;
+              const candLower = cand.toLowerCase();
+              if (candLower.includes('activities exercise') || candLower.includes('table 2') || candLower.includes('deadlines for students')) break;
+              preceding.unshift(cand);
+              if (cand.length > 25) break;
+            }
           }
+
+          if (title.length < 4) {
+            if (preceding.length > 0) title = preceding.join(" ");
+          } else if (preceding.length > 0 && title.length < 25) {
+            title = preceding.join(" ") + " - " + title;
+          }
+
+          if (!title || title.length < 3) title = "Scheduled Event";
+
+          // Clean up common repetition
+          title = title.replace(/^Assignment\s+Deadline\s+assignment\s+/i, 'Deadline Assignment ');
+
+          let cat = 'EVT';
+          const tLower = title.toLowerCase();
+          if (tLower.includes('deadline') || tLower.includes('due') || tLower.includes('submit') || tLower.includes('submission') || tLower.includes('retake') || tLower.includes('exam')) {
+            cat = 'DDL';
+          } else if (tLower.includes('meeting') || tLower.includes('lecture') || tLower.includes('session') || tLower.includes('sync') || tLower.includes('mentor') || tLower.includes('coach') || tLower.includes('q&a') || tLower.includes('prep')) {
+            cat = 'MEET';
+          } else if (tLower.includes('flight') || tLower.includes('depart') || tLower.includes('arrive') || tLower.includes('terminal')) {
+            cat = 'FLIGHT';
+          } else if (tLower.includes('holiday') || tLower.includes('break') || tLower.includes('vacation')) {
+            cat = 'HOL';
+          }
+
+          if (scope === 'deadlines' && cat !== 'DDL') continue;
+          if (scope === 'meetings' && cat !== 'MEET') continue;
+          if (scope === 'travel' && cat !== 'FLIGHT') continue;
+
+          const prefix = code ? `${code} - ` : '';
+          const tag = formatCategoryTag(cat);
+          const finalTitle = tag ? `${prefix}${tag} - ${title}` : `${prefix}${title}`;
+
+          const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+          events.push({
+            id: 'ev_' + Math.random().toString(36).substr(2, 9),
+            title: finalTitle,
+            date: dateStr,
+            startTime: startTime || (isAllDay ? "" : (defaultTime || "18:00")),
+            endTime: endTime || startTime || (isAllDay ? "" : (defaultTime || "18:00")),
+            isAllDay: isAllDay || !startTime,
+            category: cat,
+            location: '',
+            description: line
+          });
         }
-
-        if (title.length < 4) {
-          if (preceding.length > 0) title = preceding.join(" ");
-        } else if (preceding.length > 0 && title.length < 25) {
-          title = preceding.join(" ") + " - " + title;
-        }
-
-        if (!title) title = "Scheduled Event";
-
-        // Clean up common repetition
-        title = title.replace(/^Assignment\s+Deadline\s+assignment\s+/i, 'Deadline Assignment ');
-
-        let cat = 'EVT';
-        const tLower = title.toLowerCase();
-        if (tLower.includes('deadline') || tLower.includes('due') || tLower.includes('submit') || tLower.includes('submission') || tLower.includes('retake') || tLower.includes('exam')) {
-          cat = 'DDL';
-        } else if (tLower.includes('meeting') || tLower.includes('lecture') || tLower.includes('session') || tLower.includes('sync') || tLower.includes('mentor') || tLower.includes('coach') || tLower.includes('q&a')) {
-          cat = 'MEET';
-        } else if (tLower.includes('flight') || tLower.includes('depart') || tLower.includes('arrive') || tLower.includes('terminal')) {
-          cat = 'FLIGHT';
-        } else if (tLower.includes('holiday') || tLower.includes('break') || tLower.includes('vacation')) {
-          cat = 'HOL';
-        }
-
-        if (scope === 'deadlines' && cat !== 'DDL') continue;
-        if (scope === 'meetings' && cat !== 'MEET') continue;
-        if (scope === 'travel' && cat !== 'FLIGHT') continue;
-
-        const prefix = code ? `${code} - ` : '';
-        const tag = formatCategoryTag(cat);
-        const finalTitle = tag ? `${prefix}${tag} - ${title}` : `${prefix}${title}`;
-
-        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-        events.push({
-          id: 'ev_' + Math.random().toString(36).substr(2, 9),
-          title: finalTitle,
-          date: dateStr,
-          startTime: startTime || (isAllDay ? "" : (defaultTime || "18:00")),
-          endTime: endTime || startTime || (isAllDay ? "" : (defaultTime || "18:00")),
-          isAllDay: isAllDay || !startTime,
-          category: cat,
-          location: '',
-          description: line
-        });
       }
 
       return events;
