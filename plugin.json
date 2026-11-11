@@ -1,0 +1,11 @@
+{
+  "name": "doc-to-calendar",
+  "displayName": "Doc to Calendar",
+  "version": "1.0.0",
+  "description": "Extract deadlines, exams, lectures, and events from uploaded syllabi and documents into downloadable .ics calendar files.",
+  "suggestedPrompts": [
+    "/doc-to-calendar Extract all events from this course syllabus",
+    "/doc-to-calendar Parse deadlines and exams from the attached PDF",
+    "/doc-to-calendar Convert schedule document to Google Calendar .ics"
+  ]
+}
