@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Doc to Calendar — AI Calendar Extractor</title>
+  <title>Doc to Calendar — Universal Event & Schedule Extractor</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- PDF.js for client-side PDF parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <!-- Mammoth.js for client-side Word (.docx) parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <!-- Tesseract.js for in-browser Image OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     body { font-family: 'Inter', sans-serif; }
@@ -27,12 +29,13 @@
         </div>
         <div>
           <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Doc to Calendar</h1>
-          <p class="text-sm text-slate-500">Transform syllabi, schedules, and documents into calendar events (.ics)</p>
+          <p class="text-sm text-slate-500">Extract schedules, deadlines, flights, agendas & events into calendar files (.ics)</p>
         </div>
       </div>
-      <div class="mt-4 md:mt-0 flex items-center space-x-2 text-xs font-semibold">
-        <span class="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">RFC 5545 Compliant</span>
-        <span class="px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full">Google Calendar Ready</span>
+      <div class="mt-4 md:mt-0 flex flex-wrap items-center gap-2 text-xs font-semibold">
+        <span class="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">Universal RFC 5545</span>
+        <span class="px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full">Google • Apple • Outlook</span>
+        <span class="px-3 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded-full">Images & OCR Ready</span>
       </div>
     </header>
 
@@ -43,23 +46,35 @@
       <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
         <h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center">
           <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold mr-2">1</span>
-          Upload Syllabus or Schedule
+          Upload Document, Schedule, or Image
         </h2>
 
         <!-- Tabs -->
         <div class="flex border-b border-slate-200 mb-4 text-sm font-medium">
-          <button id="tab-upload" onclick="switchTab('upload')" class="py-2 px-4 border-b-2 border-blue-600 text-blue-600 font-semibold">File Upload (PDF / DOCX)</button>
-          <button id="tab-paste" onclick="switchTab('paste')" class="py-2 px-4 border-b-2 border-transparent text-slate-500 hover:text-slate-700">Paste Text</button>
+          <button id="tab-upload" onclick="switchTab('upload')" class="py-2 px-4 border-b-2 border-blue-600 text-blue-600 font-semibold">File / Image Upload</button>
+          <button id="tab-paste" onclick="switchTab('paste')" class="py-2 px-4 border-b-2 border-transparent text-slate-500 hover:text-slate-700">Paste Text / Notes</button>
         </div>
 
         <!-- Upload Box -->
         <div id="pane-upload">
           <div id="dropzone" class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-500 hover:bg-slate-50 transition-all cursor-pointer">
-            <input type="file" id="file-input" class="hidden" accept=".pdf,.docx,.doc,.txt,.md" />
-            <div class="text-4xl mb-3">📄</div>
-            <p class="text-sm font-medium text-slate-700">Drag & drop your document here, or <span class="text-blue-600 hover:underline">browse files</span></p>
-            <p class="text-xs text-slate-400 mt-1">Supports PDF (multi-page text), Word (.docx), Markdown (.md), and TXT</p>
+            <input type="file" id="file-input" class="hidden" accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg,.webp,.bmp" />
+            <div class="text-4xl mb-3">📄 🖼️</div>
+            <p class="text-sm font-medium text-slate-700">Drag & drop your document or screenshot here, or <span class="text-blue-600 hover:underline">browse files</span></p>
+            <p class="text-xs text-slate-400 mt-1">PDFs, Word docs, Images (PNG, JPG, screenshots), Project roadmaps, Travel itineraries, TXT</p>
           </div>
+          
+          <!-- OCR Progress Bar -->
+          <div id="ocr-progress" class="hidden mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-2">
+            <div class="flex justify-between text-xs font-semibold text-blue-800">
+              <span id="ocr-status">Scanning image with OCR...</span>
+              <span id="ocr-pct">0%</span>
+            </div>
+            <div class="w-full bg-blue-200 h-2 rounded-full overflow-hidden">
+              <div id="ocr-bar" class="bg-blue-600 h-full w-0 transition-all duration-200"></div>
+            </div>
+          </div>
+
           <div id="file-info" class="hidden mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-sm">
             <div class="flex items-center space-x-2">
               <span class="text-blue-600 font-medium">📎 <span id="file-name"></span></span>
@@ -71,76 +86,128 @@
 
         <!-- Paste Box -->
         <div id="pane-paste" class="hidden">
-          <textarea id="text-input" rows="6" class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Paste schedule table, syllabus text, or list of deadlines here..."></textarea>
+          <textarea id="text-input" rows="6" class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Paste itinerary dates, meeting schedule, launch milestones, or conference agenda here..."></textarea>
         </div>
       </section>
 
-      <!-- Step 2: Interactive Clarification Settings -->
+      <!-- Step 2: Interactive Configuration -->
       <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
         <h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center">
           <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold mr-2">2</span>
-          Interactive Configuration
+          Event & Calendar Configuration
         </h2>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
           <!-- Short Code -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Course Short Code</label>
-            <input type="text" id="short-code" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" placeholder="e.g. PIV2, CS101, BUS" value="PIV2" />
-            <p class="text-[11px] text-slate-400 mt-1">Prepended to event titles (e.g. PIV2 - DDL - Assignment 1)</p>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Prefix / Short Code (Optional)</label>
+            <input type="text" id="short-code" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" placeholder="e.g. TRIP, LAUNCH, CONF, BIZ" value="" />
+            <p class="text-[11px] text-slate-400 mt-1">Prepended to titles (e.g. TRIP - FLIGHT - SFO to AMS)</p>
           </div>
 
           <!-- Category Style -->
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Category Label Style</label>
             <select id="cat-style" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white">
-              <option value="short" selected>Shortened (DDL, MEET, LEC, EXAM)</option>
-              <option value="full">Full (DEADLINE, MEETING, LECTURE)</option>
-              <option value="custom">Custom (Pick your own)</option>
+              <option value="short" selected>Shortened (DDL, MEET, EVT, FLIGHT)</option>
+              <option value="full">Full Names (DEADLINE, MEETING, EVENT)</option>
+              <option value="none">No Category Tag (Title only)</option>
             </select>
-            <p class="text-[11px] text-slate-400 mt-1">Determines tag appearance in titles</p>
+            <p class="text-[11px] text-slate-400 mt-1">Determines how category tags appear in calendar titles</p>
           </div>
 
           <!-- Scope -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Scope</label>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Extraction Scope</label>
             <select id="scope-select" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white">
-              <option value="all" selected>Full Schedule (All sessions + Deadlines)</option>
-              <option value="deadlines">Deadlines, Exams & Milestones Only</option>
+              <option value="all" selected>All Events & Activities</option>
+              <option value="deadlines">Key Deadlines, Milestones & Flights Only</option>
             </select>
-            <p class="text-[11px] text-slate-400 mt-1">Filter out regular weekly sessions if desired</p>
+            <p class="text-[11px] text-slate-400 mt-1">Filter out secondary activities if desired</p>
           </div>
 
-          <!-- Default Deadline Time -->
+          <!-- Default Deadline / Event Time with All-Day Toggle -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Default Deadline Time</label>
-            <input type="time" id="default-time" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" value="23:59" />
-            <p class="text-[11px] text-slate-400 mt-1">Applied if date has no hour specified</p>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Default Event / Deadline Time</label>
+            <div class="space-y-2">
+              <input type="time" id="default-time" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" value="18:00" />
+              <label class="flex items-center space-x-2 text-xs text-slate-600 cursor-pointer">
+                <input type="checkbox" id="all-day-checkbox" onchange="toggleAllDay(this.checked)" class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                <span class="font-medium">Default to All-Day events (no specific hour)</span>
+              </label>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1">Used when the document lists a date without an exact hour</p>
           </div>
 
-          <!-- Timezone -->
+          <!-- Timezone Dropdown -->
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Timezone</label>
-            <input type="text" id="timezone-input" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" value="Europe/Amsterdam" />
-            <p class="text-[11px] text-slate-400 mt-1">Standard IANA timezone (e.g. Europe/Amsterdam, America/New_York)</p>
+            <select id="timezone-select" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white">
+              <option value="Europe/Amsterdam">Europe/Amsterdam (CET / CEST)</option>
+              <option value="Europe/London">Europe/London (GMT / BST)</option>
+              <option value="Europe/Paris">Europe/Paris (CET / CEST)</option>
+              <option value="Europe/Berlin">Europe/Berlin (CET / CEST)</option>
+              <option value="America/New_York">America/New_York (EST / EDT)</option>
+              <option value="America/Chicago">America/Chicago (CST / CDT)</option>
+              <option value="America/Denver">America/Denver (MST / MDT)</option>
+              <option value="America/Los_Angeles">America/Los_Angeles (PST / PDT)</option>
+              <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+              <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+              <option value="Asia/Dubai">Asia/Dubai (GST)</option>
+              <option value="Australia/Sydney">Australia/Sydney (AEST)</option>
+              <option value="UTC">UTC (Coordinated Universal Time)</option>
+            </select>
+            <p class="text-[11px] text-slate-400 mt-1">Calendar events will be locked to this timezone</p>
           </div>
 
-          <!-- Reminders -->
+          <!-- Output Filename -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Embedded Alarms</label>
-            <select id="reminders-select" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white">
-              <option value="standard" selected>1 week, 1 day, and 15m / 6h before</option>
-              <option value="oneday">1 day before only</option>
-              <option value="none">None (use calendar app defaults)</option>
-            </select>
-            <p class="text-[11px] text-slate-400 mt-1">Included in .ics VALARM records</p>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Calendar Name</label>
+            <input type="text" id="calendar-name-input" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" value="My_Schedule" />
+            <p class="text-[11px] text-slate-400 mt-1">Exported filename: <span id="filename-preview">My_Schedule.ics</span></p>
+          </div>
+        </div>
+
+        <!-- Dynamic Embedded Alarms Builder -->
+        <div class="mt-6 pt-5 border-t border-slate-100">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800">Embedded Alarms & Notifications</h3>
+              <p class="text-xs text-slate-500">Configure reminder triggers embedded into the .ics file.</p>
+            </div>
+            <button type="button" onclick="addAlarmRow()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center space-x-1">
+              <span>+ Add Alarm</span>
+            </button>
+          </div>
+
+          <div id="alarms-list" class="space-y-2">
+            <!-- Dynamically populated alarm rows -->
+          </div>
+        </div>
+
+        <!-- Optional AI Power Mode Toggle -->
+        <div class="mt-6 pt-4 border-t border-slate-100">
+          <button type="button" onclick="toggleAIMode()" class="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center space-x-1">
+            <span id="ai-toggle-icon">▶</span>
+            <span>Optional: Enable AI Deep Extraction (Google Gemini API)</span>
+          </button>
+          
+          <div id="ai-mode-pane" class="hidden mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+            <p class="text-slate-600">
+              For complex, multi-page PDFs or handwritten flyers, you can optionally provide a free Google Gemini API key. It will run in your browser directly to understand context and tables with high precision.
+            </p>
+            <div class="flex items-center space-x-2">
+              <input type="password" id="gemini-api-key" placeholder="Paste Google Gemini API Key (starts with AIzaSy...)" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs" />
+              <button onclick="saveApiKey()" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-lg">Save Key</button>
+            </div>
+            <p class="text-[10px] text-slate-400">Your key is stored strictly in your browser's local storage and is never sent to our servers.</p>
           </div>
         </div>
 
         <!-- Extract Action Button -->
         <div class="mt-6 flex justify-end">
           <button id="extract-btn" onclick="startExtraction()" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl shadow-md transition-all flex items-center space-x-2">
-            <span>✨ Extract Events</span>
+            <span>✨ Extract & Build Calendar</span>
           </button>
         </div>
       </section>
@@ -153,14 +220,14 @@
               <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold mr-2">3</span>
               Review Staged Events (<span id="event-count">0</span>)
             </h2>
-            <p class="text-xs text-slate-500">Edit any title, date, or category before exporting.</p>
+            <p class="text-xs text-slate-500">Edit titles, adjust dates/times, or add events before downloading.</p>
           </div>
           <div class="flex items-center space-x-2">
             <button onclick="addNewEventRow()" class="px-3 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg">
               + Add Event
             </button>
             <button onclick="downloadICS()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow flex items-center space-x-1">
-              <span>📥 Download .ics File</span>
+              <span>📥 Download .ics Calendar</span>
             </button>
           </div>
         </div>
@@ -194,13 +261,134 @@
 
   </div>
 
-  <!-- Client-Side Parsing & Calendar Logic -->
+  <!-- Client-Side Parsing, OCR & Calendar Logic -->
   <script>
-    // Set PDF.js worker
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     let currentFileContent = "";
     let extractedEvents = [];
+    let configuredAlarms = [
+      { id: 'al_1', trigger: '-P1D', triggerLabel: '1 day before', category: 'ALL' },
+      { id: 'al_2', trigger: '-PT2H', triggerLabel: '2 hours before', category: 'DDL' }
+    ];
+
+    // Auto-detect browser timezone
+    try {
+      const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const tzSelect = document.getElementById('timezone-select');
+      let found = false;
+      for (let i = 0; i < tzSelect.options.length; i++) {
+        if (tzSelect.options[i].value === userTz) {
+          tzSelect.selectedIndex = i;
+          found = true;
+          break;
+        }
+      }
+      if (!found && userTz) {
+        const opt = new Option(userTz, userTz, true, true);
+        tzSelect.add(opt);
+      }
+    } catch (e) {}
+
+    // Filename live update
+    document.getElementById('calendar-name-input').addEventListener('input', (e) => {
+      const val = e.target.value.trim() || "My_Schedule";
+      document.getElementById('filename-preview').textContent = `${val.replace(/\s+/g, '_')}.ics`;
+    });
+
+    // Toggle All-Day
+    function toggleAllDay(checked) {
+      const timeInput = document.getElementById('default-time');
+      if (checked) {
+        timeInput.disabled = true;
+        timeInput.classList.add('bg-slate-100', 'text-slate-400');
+      } else {
+        timeInput.disabled = false;
+        timeInput.classList.remove('bg-slate-100', 'text-slate-400');
+      }
+    }
+
+    // Alarm rows rendering
+    function renderAlarms() {
+      const container = document.getElementById('alarms-list');
+      container.innerHTML = "";
+      if (configuredAlarms.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 italic">No embedded alarms configured. Click "+ Add Alarm" to create one.</p>`;
+        return;
+      }
+
+      configuredAlarms.forEach((alarm, idx) => {
+        const div = document.createElement('div');
+        div.className = "flex items-center space-x-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs";
+        div.innerHTML = `
+          <span class="text-slate-400">⏰</span>
+          <select onchange="updateAlarm(${idx}, 'trigger', this.value)" class="px-2 py-1 border border-slate-300 rounded bg-white text-xs">
+            <option value="-PT15M" ${alarm.trigger === '-PT15M' ? 'selected' : ''}>15 minutes before</option>
+            <option value="-PT30M" ${alarm.trigger === '-PT30M' ? 'selected' : ''}>30 minutes before</option>
+            <option value="-PT1H" ${alarm.trigger === '-PT1H' ? 'selected' : ''}>1 hour before</option>
+            <option value="-PT2H" ${alarm.trigger === '-PT2H' ? 'selected' : ''}>2 hours before</option>
+            <option value="-PT6H" ${alarm.trigger === '-PT6H' ? 'selected' : ''}>6 hours before</option>
+            <option value="-P1D" ${alarm.trigger === '-P1D' ? 'selected' : ''}>1 day before</option>
+            <option value="-P2D" ${alarm.trigger === '-P2D' ? 'selected' : ''}>2 days before</option>
+            <option value="-P7D" ${alarm.trigger === '-P7D' ? 'selected' : ''}>1 week before</option>
+          </select>
+          <span class="text-slate-500 font-medium">for</span>
+          <select onchange="updateAlarm(${idx}, 'category', this.value)" class="px-2 py-1 border border-slate-300 rounded bg-white text-xs">
+            <option value="ALL" ${alarm.category === 'ALL' ? 'selected' : ''}>All Categories</option>
+            <option value="DDL" ${alarm.category === 'DDL' ? 'selected' : ''}>Deadlines & Milestones only</option>
+            <option value="MEET" ${alarm.category === 'MEET' ? 'selected' : ''}>Meetings & Appointments only</option>
+            <option value="EVT" ${alarm.category === 'EVT' ? 'selected' : ''}>Events & Sessions only</option>
+            <option value="FLIGHT" ${alarm.category === 'FLIGHT' ? 'selected' : ''}>Flights & Travel only</option>
+          </select>
+          <button type="button" onclick="removeAlarm(${idx})" class="ml-auto text-rose-500 hover:text-rose-700 font-bold px-1.5">✕</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function addAlarmRow() {
+      configuredAlarms.push({
+        id: 'al_' + Date.now(),
+        trigger: '-PT1H',
+        category: 'ALL'
+      });
+      renderAlarms();
+    }
+
+    function updateAlarm(idx, field, val) {
+      if (configuredAlarms[idx]) {
+        configuredAlarms[idx][field] = val;
+      }
+    }
+
+    function removeAlarm(idx) {
+      configuredAlarms.splice(idx, 1);
+      renderAlarms();
+    }
+    renderAlarms();
+
+    // AI Mode
+    function toggleAIMode() {
+      const pane = document.getElementById('ai-mode-pane');
+      const icon = document.getElementById('ai-toggle-icon');
+      if (pane.classList.contains('hidden')) {
+        pane.classList.remove('hidden');
+        icon.textContent = '▼';
+        const saved = localStorage.getItem('gemini_api_key');
+        if (saved) document.getElementById('gemini-api-key').value = saved;
+      } else {
+        pane.classList.add('hidden');
+        icon.textContent = '▶';
+      }
+    }
+
+    function saveApiKey() {
+      const key = document.getElementById('gemini-api-key').value.trim();
+      if (key) {
+        localStorage.setItem('gemini_api_key', key);
+        alert("Gemini API key saved in browser storage!");
+      }
+    }
 
     // Tabs
     function switchTab(tab) {
@@ -241,7 +429,37 @@
 
       const ext = file.name.split('.').pop().toLowerCase();
 
-      if (ext === 'pdf') {
+      // Check if image
+      if (['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext)) {
+        const ocrProgress = document.getElementById('ocr-progress');
+        const ocrStatus = document.getElementById('ocr-status');
+        const ocrBar = document.getElementById('ocr-bar');
+        const ocrPct = document.getElementById('ocr-pct');
+        ocrProgress.classList.remove('hidden');
+
+        try {
+          const result = await Tesseract.recognize(
+            file,
+            'eng',
+            {
+              logger: m => {
+                if (m.status === 'recognizing text') {
+                  const pct = Math.round(m.progress * 100);
+                  ocrStatus.textContent = `Reading text from image... (${pct}%)`;
+                  ocrPct.textContent = `${pct}%`;
+                  ocrBar.style.width = `${pct}%`;
+                }
+              }
+            }
+          );
+          currentFileContent = result.data.text;
+          ocrStatus.textContent = "Image successfully scanned!";
+          setTimeout(() => ocrProgress.classList.add('hidden'), 1500);
+        } catch (err) {
+          console.error(err);
+          ocrStatus.textContent = "OCR error: Could not read image text.";
+        }
+      } else if (ext === 'pdf') {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         let text = "";
@@ -264,48 +482,104 @@
       fileInput.value = "";
       currentFileContent = "";
       document.getElementById('file-info').classList.add('hidden');
+      document.getElementById('ocr-progress').classList.add('hidden');
       dropzone.classList.remove('hidden');
     }
 
-    // Core Extraction Logic
-    function startExtraction() {
+    async function startExtraction() {
       const text = currentFileContent || document.getElementById('text-input').value;
       if (!text.trim()) {
-        alert("Please upload a file or paste text first!");
+        alert("Please upload a file, screenshot, or paste text first!");
         return;
       }
 
       const shortCode = document.getElementById('short-code').value.trim();
       const catStyle = document.getElementById('cat-style').value;
-      const defaultTime = document.getElementById('default-time').value || "23:59";
+      const isAllDayDefault = document.getElementById('all-day-checkbox').checked;
+      const defaultTime = isAllDayDefault ? null : (document.getElementById('default-time').value || "18:00");
       const scope = document.getElementById('scope-select').value;
+      const apiKey = localStorage.getItem('gemini_api_key') || document.getElementById('gemini-api-key').value.trim();
 
-      // Extract lines & dates
-      extractedEvents = parseDocumentEvents(text, shortCode, catStyle, defaultTime, scope);
+      // If API key is available, call Gemini API for advanced semantic understanding
+      if (apiKey) {
+        document.getElementById('extract-btn').innerHTML = "<span>🤖 AI Analyzing...</span>";
+        document.getElementById('extract-btn').disabled = true;
+        try {
+          extractedEvents = await callGeminiExtraction(text, apiKey, shortCode, catStyle, defaultTime, isAllDayDefault);
+        } catch (err) {
+          console.warn("AI extraction fallback to rule-based parser:", err);
+          extractedEvents = parseDocumentEvents(text, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
+        } finally {
+          document.getElementById('extract-btn').innerHTML = "<span>✨ Extract & Build Calendar</span>";
+          document.getElementById('extract-btn').disabled = false;
+        }
+      } else {
+        extractedEvents = parseDocumentEvents(text, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
+      }
 
       renderTable();
       document.getElementById('results-section').classList.remove('hidden');
       document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
     }
 
-    // Parser implementation
-    function parseDocumentEvents(text, code, catStyle, defaultTime, scope) {
+    // Gemini API Direct Client-side Call
+    async function callGeminiExtraction(text, apiKey, code, catStyle, defaultTime, isAllDay) {
+      const prompt = `Extract all calendar events, deadlines, meetings, travel, flights, holidays, and milestones from this document into a valid JSON array of objects.
+Each object must have:
+- title: string (format as ${code ? code + ' - ' : ''}[CATEGORY] - Event Title)
+- date: YYYY-MM-DD
+- startTime: HH:MM or null if all-day
+- endTime: HH:MM or null
+- isAllDay: boolean
+- category: DDL / MEET / EVT / FLIGHT / HOL / MILE
+- location: string
+- description: string (rich context, details, requirements)
+
+Document text:
+${text.substring(0, 15000)}
+
+Respond with JSON only, matching [{title, date, startTime, endTime, isAllDay, category, location, description}].`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      });
+
+      const data = await res.json();
+      const rawJson = data.candidates[0].content.parts[0].text;
+      const parsed = JSON.parse(rawJson);
+      return parsed.map(item => ({
+        id: 'ev_' + Math.random().toString(36).substr(2, 9),
+        title: item.title,
+        date: item.date,
+        startTime: item.startTime || (isAllDay ? "" : (defaultTime || "18:00")),
+        endTime: item.endTime || item.startTime || (isAllDay ? "" : (defaultTime || "18:00")),
+        isAllDay: item.isAllDay || isAllDay,
+        category: item.category || 'EVT',
+        location: item.location || '',
+        description: item.description || ''
+      }));
+    }
+
+    // Universal Rule-based Parser (Offline / Zero Setup)
+    function parseDocumentEvents(text, code, catStyle, defaultTime, isAllDay, scope) {
       const events = [];
       const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
-      // Category mapper
       function getCategoryTag(cat) {
+        if (catStyle === 'none') return '';
         if (catStyle === 'full') {
-          return cat === 'DDL' ? 'DEADLINE' : cat === 'MEET' ? 'MEETING' : cat === 'LEC' ? 'LECTURE' : cat === 'HOL' ? 'HOLIDAY' : cat;
+          return cat === 'DDL' ? 'DEADLINE' : cat === 'MEET' ? 'MEETING' : cat === 'EVT' ? 'EVENT' : cat === 'FLIGHT' ? 'FLIGHT' : cat === 'HOL' ? 'HOLIDAY' : cat;
         }
         return cat;
       }
 
-      // Regexes for detecting dates
-      // e.g. "Monday, November 9 17.00", "Tuesday, Jan 12 10.45-12.30", "2026-11-20", "Nov 10th 8:45-12:30"
       const dateRegex = /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)?[\s,]*([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?(?:[^\d\n]*(\d{1,2}[:.]\d{2})\s*(?:[-–]\s*(\d{1,2}[:.]\d{2}))?)?/i;
 
-      // Scan lines for activities / deadlines
       const months = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12,
                        january:1, february:2, march:3, april:4, may:5, june:6, july:7, august:8, september:9, october:10, november:11, december:12 };
 
@@ -322,35 +596,36 @@
           const currentYear = new Date().getFullYear();
           let year = match[3] ? parseInt(match[3], 10) : (month >= 9 ? currentYear : currentYear + 1);
 
-          let startTime = match[4] ? match[4].replace('.', ':') : defaultTime;
+          let startTime = match[4] ? match[4].replace('.', ':') : (isAllDay ? "" : defaultTime);
           let endTime = match[5] ? match[5].replace('.', ':') : startTime;
 
-          // Normalize time string
-          if (startTime.length === 4 && startTime[1] === ':') startTime = '0' + startTime;
-          if (endTime.length === 4 && endTime[1] === ':') endTime = '0' + endTime;
+          if (startTime && startTime.length === 4 && startTime[1] === ':') startTime = '0' + startTime;
+          if (endTime && endTime.length === 4 && endTime[1] === ':') endTime = '0' + endTime;
 
-          // Categorize based on line keywords
-          let cat = "MEET";
+          let cat = "EVT";
           let cleanLine = line.replace(match[0], '').trim();
 
-          if (/deadline|due|submit|hand-in|assignment|pdp|rubric|reassessment/i.test(line)) {
+          if (/deadline|due|submit|hand-in|assignment|payment|bill|tax|milestone/i.test(line)) {
             cat = "DDL";
-          } else if (/lecture|class|presentation|keynote/i.test(line)) {
-            cat = "LEC";
-          } else if (/exam|oral|quiz|midterm|final/i.test(line)) {
-            cat = "EXAM";
-          } else if (/holiday|break|vacation|closed/i.test(line)) {
+          } else if (/meeting|call|sync|consultation|interview|appointment/i.test(line)) {
+            cat = "MEET";
+          } else if (/flight|departure|arrival|hotel|check-in|tour|train/i.test(line)) {
+            cat = "FLIGHT";
+          } else if (/holiday|vacation|break|closure|bank holiday/i.test(line)) {
             cat = "HOL";
           }
 
-          if (scope === 'deadlines' && (cat === 'LEC' || cat === 'MEET')) {
+          if (scope === 'deadlines' && (cat === 'EVT' || cat === 'MEET')) {
             continue;
           }
 
           const catTag = getCategoryTag(cat);
-          const prefix = code ? `${code} - ${catTag} - ` : `${catTag} - `;
-          const title = prefix + (cleanLine || `Event on ${match[1]} ${day}`);
+          let prefix = "";
+          if (code && catTag) prefix = `${code} - ${catTag} - `;
+          else if (code) prefix = `${code} - `;
+          else if (catTag) prefix = `${catTag} - `;
 
+          const title = prefix + (cleanLine || `Event on ${match[1]} ${day}`);
           const pad = (n) => String(n).padStart(2, '0');
           const dateStr = `${year}-${pad(month)}-${pad(day)}`;
 
@@ -360,24 +635,25 @@
             date: dateStr,
             startTime: startTime,
             endTime: endTime,
-            category: catTag,
-            location: "TU/e / Canvas",
+            isAllDay: isAllDay || !startTime,
+            category: catTag || 'EVENT',
+            location: "",
             description: line
           });
         }
       }
 
-      // If text didn't yield matches, provide default staged rows
       if (events.length === 0) {
         events.push({
           id: 'ev_1',
-          title: (code ? `${code} - ` : '') + 'DDL - Assignment 1 Submission',
-          date: '2026-11-09',
-          startTime: '17:00',
-          endTime: '17:00',
+          title: (code ? `${code} - ` : '') + 'DDL - Project Milestone',
+          date: new Date().toISOString().split('T')[0],
+          startTime: isAllDay ? "" : "18:00",
+          endTime: isAllDay ? "" : "18:00",
+          isAllDay: isAllDay,
           category: 'DDL',
-          location: 'Canvas',
-          description: 'Submit updated PI&V presentation on Canvas.'
+          location: '',
+          description: 'Sample extracted event'
         });
       }
 
@@ -394,8 +670,13 @@
         tr.className = "hover:bg-slate-50 transition-colors";
         tr.innerHTML = `
           <td class="py-2.5 px-3 whitespace-nowrap"><input type="date" value="${ev.date}" onchange="updateEvent(${idx}, 'date', this.value)" class="border border-slate-200 rounded px-1.5 py-1 text-xs"></td>
-          <td class="py-2.5 px-3 whitespace-nowrap"><input type="time" value="${ev.startTime}" onchange="updateEvent(${idx}, 'startTime', this.value)" class="border border-slate-200 rounded px-1.5 py-1 text-xs w-20"></td>
-          <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${ev.category.includes('DDL') ? 'bg-rose-100 text-rose-700' : ev.category.includes('MEET') ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${ev.category}</span></td>
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            ${ev.isAllDay 
+              ? `<span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">ALL-DAY</span>`
+              : `<input type="time" value="${ev.startTime || '18:00'}" onchange="updateEvent(${idx}, 'startTime', this.value)" class="border border-slate-200 rounded px-1.5 py-1 text-xs w-20">`
+            }
+          </td>
+          <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${ev.category.includes('DDL') ? 'bg-rose-100 text-rose-700' : ev.category.includes('MEET') ? 'bg-amber-100 text-amber-700' : ev.category.includes('FLIGHT') ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">${ev.category}</span></td>
           <td class="py-2.5 px-3 font-medium text-slate-900"><input type="text" value="${ev.title}" onchange="updateEvent(${idx}, 'title', this.value)" class="w-full border border-slate-200 rounded px-2 py-1 text-xs"></td>
           <td class="py-2.5 px-3 text-slate-500"><input type="text" value="${ev.description}" onchange="updateEvent(${idx}, 'description', this.value)" class="w-full border border-slate-200 rounded px-2 py-1 text-xs"></td>
           <td class="py-2.5 px-2 text-center"><button onclick="deleteEvent(${idx})" class="text-rose-500 hover:text-rose-700 font-bold">✕</button></td>
@@ -417,34 +698,35 @@
 
     function addNewEventRow() {
       const code = document.getElementById('short-code').value.trim();
+      const isAllDay = document.getElementById('all-day-checkbox').checked;
       extractedEvents.push({
         id: 'ev_' + Date.now(),
-        title: (code ? `${code} - ` : '') + 'DDL - New Milestone',
+        title: (code ? `${code} - ` : '') + 'EVENT - Custom Milestone',
         date: new Date().toISOString().split('T')[0],
-        startTime: '17:00',
-        endTime: '17:00',
-        category: 'DDL',
-        location: 'Campus',
+        startTime: isAllDay ? "" : "18:00",
+        endTime: isAllDay ? "" : "18:00",
+        isAllDay: isAllDay,
+        category: 'EVENT',
+        location: '',
         description: 'Custom added event'
       });
       renderTable();
     }
 
-    // RFC 5545 iCalendar Generator (.ics)
+    // RFC 5545 iCalendar Generator
     function downloadICS() {
       if (extractedEvents.length === 0) {
         alert("No events to export!");
         return;
       }
 
-      const calName = document.getElementById('short-code').value.trim() ? `${document.getElementById('short-code').value.trim()} Schedule` : "Extracted Schedule";
-      const tz = document.getElementById('timezone-input').value.trim() || "Europe/Amsterdam";
-      const reminderChoice = document.getElementById('reminders-select').value;
+      const calName = document.getElementById('calendar-name-input').value.trim() || "My_Schedule";
+      const tz = document.getElementById('timezone-select').value.trim() || "Europe/Amsterdam";
 
       let lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//DocToCalendar Web App//EN",
+        "PRODID:-//DocToCalendar Universal Web App//EN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
         `X-WR-CALNAME:${calName}`,
@@ -459,35 +741,45 @@
         lines.push(`DTSTAMP:${now}`);
         lines.push(`SUMMARY:${ev.title.replace(/[,;]/g, '\\$&')}`);
 
-        // Date-time
         const dtClean = ev.date.replace(/-/g, '');
-        const stClean = ev.startTime ? ev.startTime.replace(':', '') + '00' : '000000';
-        const etClean = ev.endTime ? ev.endTime.replace(':', '') + '00' : stClean;
 
-        lines.push(`DTSTART;TZID=${tz}:${dtClean}T${stClean}`);
-        lines.push(`DTEND;TZID=${tz}:${dtClean}T${etClean}`);
-        lines.push(`DESCRIPTION:${(ev.description || '').replace(/\n/g, '\\n').replace(/[,;]/g, '\\$&')}`);
-        lines.push(`LOCATION:${(ev.location || '').replace(/[,;]/g, '\\$&')}`);
+        if (ev.isAllDay || !ev.startTime) {
+          lines.push(`DTSTART;VALUE=DATE:${dtClean}`);
+          lines.push(`DTEND;VALUE=DATE:${dtClean}`);
+        } else {
+          const stClean = ev.startTime.replace(':', '') + '00';
+          const etClean = (ev.endTime ? ev.endTime.replace(':', '') : ev.startTime.replace(':', '')) + '00';
+          lines.push(`DTSTART;TZID=${tz}:${dtClean}T${stClean}`);
+          lines.push(`DTEND;TZID=${tz}:${dtClean}T${etClean}`);
+        }
+
+        if (ev.description) lines.push(`DESCRIPTION:${ev.description.replace(/\n/g, '\\n').replace(/[,;]/g, '\\$&')}`);
+        if (ev.location) lines.push(`LOCATION:${ev.location.replace(/[,;]/g, '\\$&')}`);
         lines.push("STATUS:CONFIRMED");
 
-        // Alarms
-        if (reminderChoice === 'standard') {
-          lines.push("BEGIN:VALARM");
-          lines.push("ACTION:DISPLAY");
-          lines.push(`DESCRIPTION:Reminder: ${ev.title.replace(/[,;]/g, '\\$&')}`);
-          lines.push("TRIGGER:-P1D");
-          lines.push("END:VALARM");
-        }
+        // Dynamic Alarms
+        configuredAlarms.forEach(alarm => {
+          const applies = (alarm.category === 'ALL') || 
+                          (alarm.category === 'DDL' && (ev.category.includes('DDL') || ev.title.includes('DEADLINE'))) ||
+                          (alarm.category === 'MEET' && (ev.category.includes('MEET') || ev.title.includes('MEETING'))) ||
+                          (alarm.category === 'FLIGHT' && (ev.category.includes('FLIGHT') || ev.title.includes('FLIGHT')));
+
+          if (applies) {
+            lines.push("BEGIN:VALARM");
+            lines.push("ACTION:DISPLAY");
+            lines.push(`DESCRIPTION:Reminder: ${ev.title.replace(/[,;]/g, '\\$&')}`);
+            lines.push(`TRIGGER:${alarm.trigger}`);
+            lines.push("END:VALARM");
+          }
+        });
 
         lines.push("END:VEVENT");
       });
 
       lines.push("END:VCALENDAR");
 
-      // Line folding
       const folded = lines.map(l => l.length > 75 ? l.substring(0, 75) + "\r\n " + l.substring(75) : l).join("\r\n");
 
-      // Trigger download
       const blob = new Blob([folded], { type: 'text/calendar;charset=utf-8' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
