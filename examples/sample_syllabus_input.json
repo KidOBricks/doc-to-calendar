@@ -1,0 +1,40 @@
+{
+  "calendar_name": "CS101 Intro to Computer Science",
+  "timezone": "America/New_York",
+  "default_reminders": [-1440, -120],
+  "events": [
+    {
+      "title": "CS101 - LEC - Course Introduction & Environment Setup",
+      "start": "2026-09-02T10:00:00",
+      "end": "2026-09-02T11:30:00",
+      "category": "LEC",
+      "location": "Turing Hall 101",
+      "description": "Welcome to CS101. Overview of syllabus, grading policies, and IDE configuration.\nReadings: Chapter 1."
+    },
+    {
+      "title": "CS101 - DDL - Problem Set 1: Basics & Control Flow",
+      "start": "2026-09-18T23:59:00",
+      "end": "2026-09-18T23:59:00",
+      "category": "DDL",
+      "location": "Gradescope",
+      "description": "Submit code files via Gradescope.\nWorth 10% of final grade.\nLate submissions incur 10% penalty per day."
+    },
+    {
+      "title": "CS101 - EXAM - Midterm Examination",
+      "start": "2026-10-15T14:00:00",
+      "end": "2026-10-15T16:00:00",
+      "category": "EXAM",
+      "location": "Science Center Auditorium B",
+      "description": "Closed-book midterm covering Units 1-4. Bring student ID and 2B pencils.\nWorth 25% of final grade.",
+      "reminders": [-10080, -1440, -120]
+    },
+    {
+      "title": "CS101 - HOL - Fall Break",
+      "start": "2026-11-23",
+      "end": "2026-11-28",
+      "category": "HOL",
+      "description": "University closed. No classes or office hours.",
+      "reminders": []
+    }
+  ]
+}
