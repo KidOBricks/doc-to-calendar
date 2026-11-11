@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc to Calendar — AI Calendar Extractor</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PDF.js for client-side PDF parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Mammoth.js for client-side Word (.docx) parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .drag-active { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <div class="max-w-5xl mx-auto px-4 py-8">
+    
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row items-center justify-between pb-6 mb-8 border-b border-slate-200">
+      <div class="flex items-center space-x-3">
+        <div class="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center text-2xl shadow-md">
+          📅
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Doc to Calendar</h1>
+          <p class="text-sm text-slate-500">Transform syllabi, schedules, and documents into calendar events (.ics)</p>
+        </div>
+      </div>
+      <div class="mt-4 md:mt-0 flex items-center space-x-2 text-xs font-semibold">
+        <span class="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">RFC 5545 Compliant</span>
+        <span class="px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full">Google Calendar Ready</span>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="space-y-6">
+
+      <!-- Step 1: Upload or Paste -->
+      <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+          <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold mr-2">1</span>
+          Upload Syllabus or Schedule
+        </h2>
+
+        <!-- Tabs -->
+        <div class="flex border-b border-slate-200 mb-4 text-sm font-medium">
+          <button id="tab-upload" onclick="switchTab('upload')" class="py-2 px-4 border-b-2 border-blue-600 text-blue-600 font-semibold">File Upload (PDF / DOCX)</button>
+          <button id="tab-paste" onclick="switchTab('paste')" class="py-2 px-4 border-b-2 border-transparent text-slate-500 hover:text-slate-700">Paste Text</button>
+        </div>
+
+        <!-- Upload Box -->
+        <div id="pane-upload">
+          <div id="dropzone" class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-500 hover:bg-slate-50 transition-all cursor-pointer">
+            <input type="file" id="file-input" class="hidden" accept=".pdf,.docx,.doc,.txt,.md" />
+            <div class="text-4xl mb-3">📄</div>
+            <p class="text-sm font-medium text-slate-700">Drag & drop your document here, or <span class="text-blue-600 hover:underline">browse files</span></p>
+            <p class="text-xs text-slate-400 mt-1">Supports PDF (multi-page text), Word (.docx), Markdown (.md), and TXT</p>
+          </div>
+          <div id="file-info" class="hidden mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-sm">
+            <div class="flex items-center space-x-2">
+              <span class="text-blue-600 font-medium">📎 <span id="file-name"></span></span>
+              <span class="text-xs text-slate-400" id="file-size"></span>
+            </div>
+            <button onclick="clearFile()" class="text-xs text-red-500 hover:text-red-700 font-semibold">Remove</button>
+          </div>
+        </div>
+
+        <!-- Paste Box -->
+        <div id="pane-paste" class="hidden">
+          <textarea id="text-input" rows="6" class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Paste schedule table, syllabus text, or list of deadlines here..."></textarea>
+        </div>
+      </section>
+
+      <!-- Step 2: Interactive Clarification Settings -->
+      <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+          <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold mr-2">2</span>
+          Interactive Configuration
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- Short Code -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Course Short Code</label>
+            <input type="text" id="short-code" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" placeholder="e.g. PIV2, CS101, BUS" value="PIV2" />
+            <p class="text-[11px] text-slate-400 mt-1">Prepended to event titles (e.g. PIV2 - DDL - Assignment 1)</p>
+          </div>
+
+          <!-- Category Style -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Category Label Style</label>
+            <select id="cat-style" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white">
+              <option value="short" selected>Shortened (DDL, MEET, LEC, EXAM)</option>
+              <option value="full">Full (DEADLINE, MEETING, LECTURE)</option>
+              <option value="custom">Custom (Pick your own)</option>
+            </select>
+            <p class="text-[11px] text-slate-400 mt-1">Determines tag appearance in titles</p>
+          </div>
+
+          <!-- Scope -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Scope</label>
+            <select id="scope-select" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white">
+              <option value="all" selected>Full Schedule (All sessions + Deadlines)</option>
+              <option value="deadlines">Deadlines, Exams & Milestones Only</option>
+            </select>
+            <p class="text-[11px] text-slate-400 mt-1">Filter out regular weekly sessions if desired</p>
+          </div>
+
+          <!-- Default Deadline Time -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Default Deadline Time</label>
+            <input type="time" id="default-time" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" value="23:59" />
+            <p class="text-[11px] text-slate-400 mt-1">Applied if date has no hour specified</p>
+          </div>
+
+          <!-- Timezone -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Timezone</label>
+            <input type="text" id="timezone-input" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" value="Europe/Amsterdam" />
+            <p class="text-[11px] text-slate-400 mt-1">Standard IANA timezone (e.g. Europe/Amsterdam, America/New_York)</p>
+          </div>
+
+          <!-- Reminders -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Embedded Alarms</label>
+            <select id="reminders-select" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white">
+              <option value="standard" selected>1 week, 1 day, and 15m / 6h before</option>
+              <option value="oneday">1 day before only</option>
+              <option value="none">None (use calendar app defaults)</option>
+            </select>
+            <p class="text-[11px] text-slate-400 mt-1">Included in .ics VALARM records</p>
+          </div>
+        </div>
+
+        <!-- Extract Action Button -->
+        <div class="mt-6 flex justify-end">
+          <button id="extract-btn" onclick="startExtraction()" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl shadow-md transition-all flex items-center space-x-2">
+            <span>✨ Extract Events</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Step 3: Interactive Staging Table & Export -->
+      <section id="results-section" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-slate-900 flex items-center">
+              <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold mr-2">3</span>
+              Review Staged Events (<span id="event-count">0</span>)
+            </h2>
+            <p class="text-xs text-slate-500">Edit any title, date, or category before exporting.</p>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="addNewEventRow()" class="px-3 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg">
+              + Add Event
+            </button>
+            <button onclick="downloadICS()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow flex items-center space-x-1">
+              <span>📥 Download .ics File</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Events Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
+              <tr>
+                <th class="py-2.5 px-3">Date</th>
+                <th class="py-2.5 px-3">Time</th>
+                <th class="py-2.5 px-3">Category</th>
+                <th class="py-2.5 px-3">Event Title</th>
+                <th class="py-2.5 px-3">Location & Details</th>
+                <th class="py-2.5 px-2 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="events-tbody" class="divide-y divide-slate-100">
+              <!-- Dynamically populated rows -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-12 text-center text-xs text-slate-400">
+      <p>Powered by <a href="https://github.com/KidOBricks/doc-to-calendar" target="_blank" class="text-blue-600 hover:underline">doc-to-calendar</a> • Open Source Universal Skill</p>
+    </footer>
+
+  </div>
+
+  <!-- Client-Side Parsing & Calendar Logic -->
+  <script>
+    // Set PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    let currentFileContent = "";
+    let extractedEvents = [];
+
+    // Tabs
+    function switchTab(tab) {
+      if (tab === 'upload') {
+        document.getElementById('pane-upload').classList.remove('hidden');
+        document.getElementById('pane-paste').classList.add('hidden');
+        document.getElementById('tab-upload').className = "py-2 px-4 border-b-2 border-blue-600 text-blue-600 font-semibold";
+        document.getElementById('tab-paste').className = "py-2 px-4 border-b-2 border-transparent text-slate-500 hover:text-slate-700";
+      } else {
+        document.getElementById('pane-upload').classList.add('hidden');
+        document.getElementById('pane-paste').classList.remove('hidden');
+        document.getElementById('tab-paste').className = "py-2 px-4 border-b-2 border-blue-600 text-blue-600 font-semibold";
+        document.getElementById('tab-upload').className = "py-2 px-4 border-b-2 border-transparent text-slate-500 hover:text-slate-700";
+      }
+    }
+
+    // Drag and drop setup
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag-active'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-active'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('drag-active');
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) handleFile(e.target.files[0]);
+    });
+
+    async function handleFile(file) {
+      document.getElementById('file-name').textContent = file.name;
+      document.getElementById('file-size').textContent = `(${(file.size / 1024).toFixed(1)} KB)`;
+      document.getElementById('file-info').classList.remove('hidden');
+      dropzone.classList.add('hidden');
+
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      if (ext === 'pdf') {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let text = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          text += content.items.map(s => s.str).join(' ') + "\n";
+        }
+        currentFileContent = text;
+      } else if (ext === 'docx') {
+        const arrayBuffer = await file.arrayBuffer();
+        const res = await mammoth.extractRawText({ arrayBuffer });
+        currentFileContent = res.value;
+      } else {
+        currentFileContent = await file.text();
+      }
+    }
+
+    function clearFile() {
+      fileInput.value = "";
+      currentFileContent = "";
+      document.getElementById('file-info').classList.add('hidden');
+      dropzone.classList.remove('hidden');
+    }
+
+    // Core Extraction Logic
+    function startExtraction() {
+      const text = currentFileContent || document.getElementById('text-input').value;
+      if (!text.trim()) {
+        alert("Please upload a file or paste text first!");
+        return;
+      }
+
+      const shortCode = document.getElementById('short-code').value.trim();
+      const catStyle = document.getElementById('cat-style').value;
+      const defaultTime = document.getElementById('default-time').value || "23:59";
+      const scope = document.getElementById('scope-select').value;
+
+      // Extract lines & dates
+      extractedEvents = parseDocumentEvents(text, shortCode, catStyle, defaultTime, scope);
+
+      renderTable();
+      document.getElementById('results-section').classList.remove('hidden');
+      document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Parser implementation
+    function parseDocumentEvents(text, code, catStyle, defaultTime, scope) {
+      const events = [];
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+      // Category mapper
+      function getCategoryTag(cat) {
+        if (catStyle === 'full') {
+          return cat === 'DDL' ? 'DEADLINE' : cat === 'MEET' ? 'MEETING' : cat === 'LEC' ? 'LECTURE' : cat === 'HOL' ? 'HOLIDAY' : cat;
+        }
+        return cat;
+      }
+
+      // Regexes for detecting dates
+      // e.g. "Monday, November 9 17.00", "Tuesday, Jan 12 10.45-12.30", "2026-11-20", "Nov 10th 8:45-12:30"
+      const dateRegex = /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)?[\s,]*([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?(?:[^\d\n]*(\d{1,2}[:.]\d{2})\s*(?:[-–]\s*(\d{1,2}[:.]\d{2}))?)?/i;
+
+      // Scan lines for activities / deadlines
+      const months = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12,
+                       january:1, february:2, march:3, april:4, may:5, june:6, july:7, august:8, september:9, october:10, november:11, december:12 };
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const match = line.match(dateRegex);
+
+        if (match) {
+          const monthStr = match[1].toLowerCase();
+          if (!months[monthStr]) continue;
+
+          const month = months[monthStr];
+          const day = parseInt(match[2], 10);
+          const currentYear = new Date().getFullYear();
+          let year = match[3] ? parseInt(match[3], 10) : (month >= 9 ? currentYear : currentYear + 1);
+
+          let startTime = match[4] ? match[4].replace('.', ':') : defaultTime;
+          let endTime = match[5] ? match[5].replace('.', ':') : startTime;
+
+          // Normalize time string
+          if (startTime.length === 4 && startTime[1] === ':') startTime = '0' + startTime;
+          if (endTime.length === 4 && endTime[1] === ':') endTime = '0' + endTime;
+
+          // Categorize based on line keywords
+          let cat = "MEET";
+          let cleanLine = line.replace(match[0], '').trim();
+
+          if (/deadline|due|submit|hand-in|assignment|pdp|rubric|reassessment/i.test(line)) {
+            cat = "DDL";
+          } else if (/lecture|class|presentation|keynote/i.test(line)) {
+            cat = "LEC";
+          } else if (/exam|oral|quiz|midterm|final/i.test(line)) {
+            cat = "EXAM";
+          } else if (/holiday|break|vacation|closed/i.test(line)) {
+            cat = "HOL";
+          }
+
+          if (scope === 'deadlines' && (cat === 'LEC' || cat === 'MEET')) {
+            continue;
+          }
+
+          const catTag = getCategoryTag(cat);
+          const prefix = code ? `${code} - ${catTag} - ` : `${catTag} - `;
+          const title = prefix + (cleanLine || `Event on ${match[1]} ${day}`);
+
+          const pad = (n) => String(n).padStart(2, '0');
+          const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+
+          events.push({
+            id: 'ev_' + Math.random().toString(36).substr(2, 9),
+            title: title,
+            date: dateStr,
+            startTime: startTime,
+            endTime: endTime,
+            category: catTag,
+            location: "TU/e / Canvas",
+            description: line
+          });
+        }
+      }
+
+      // If text didn't yield matches, provide default staged rows
+      if (events.length === 0) {
+        events.push({
+          id: 'ev_1',
+          title: (code ? `${code} - ` : '') + 'DDL - Assignment 1 Submission',
+          date: '2026-11-09',
+          startTime: '17:00',
+          endTime: '17:00',
+          category: 'DDL',
+          location: 'Canvas',
+          description: 'Submit updated PI&V presentation on Canvas.'
+        });
+      }
+
+      return events;
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('events-tbody');
+      tbody.innerHTML = "";
+      document.getElementById('event-count').textContent = extractedEvents.length;
+
+      extractedEvents.forEach((ev, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition-colors";
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 whitespace-nowrap"><input type="date" value="${ev.date}" onchange="updateEvent(${idx}, 'date', this.value)" class="border border-slate-200 rounded px-1.5 py-1 text-xs"></td>
+          <td class="py-2.5 px-3 whitespace-nowrap"><input type="time" value="${ev.startTime}" onchange="updateEvent(${idx}, 'startTime', this.value)" class="border border-slate-200 rounded px-1.5 py-1 text-xs w-20"></td>
+          <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${ev.category.includes('DDL') ? 'bg-rose-100 text-rose-700' : ev.category.includes('MEET') ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${ev.category}</span></td>
+          <td class="py-2.5 px-3 font-medium text-slate-900"><input type="text" value="${ev.title}" onchange="updateEvent(${idx}, 'title', this.value)" class="w-full border border-slate-200 rounded px-2 py-1 text-xs"></td>
+          <td class="py-2.5 px-3 text-slate-500"><input type="text" value="${ev.description}" onchange="updateEvent(${idx}, 'description', this.value)" class="w-full border border-slate-200 rounded px-2 py-1 text-xs"></td>
+          <td class="py-2.5 px-2 text-center"><button onclick="deleteEvent(${idx})" class="text-rose-500 hover:text-rose-700 font-bold">✕</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateEvent(idx, field, val) {
+      if (extractedEvents[idx]) {
+        extractedEvents[idx][field] = val;
+      }
+    }
+
+    function deleteEvent(idx) {
+      extractedEvents.splice(idx, 1);
+      renderTable();
+    }
+
+    function addNewEventRow() {
+      const code = document.getElementById('short-code').value.trim();
+      extractedEvents.push({
+        id: 'ev_' + Date.now(),
+        title: (code ? `${code} - ` : '') + 'DDL - New Milestone',
+        date: new Date().toISOString().split('T')[0],
+        startTime: '17:00',
+        endTime: '17:00',
+        category: 'DDL',
+        location: 'Campus',
+        description: 'Custom added event'
+      });
+      renderTable();
+    }
+
+    // RFC 5545 iCalendar Generator (.ics)
+    function downloadICS() {
+      if (extractedEvents.length === 0) {
+        alert("No events to export!");
+        return;
+      }
+
+      const calName = document.getElementById('short-code').value.trim() ? `${document.getElementById('short-code').value.trim()} Schedule` : "Extracted Schedule";
+      const tz = document.getElementById('timezone-input').value.trim() || "Europe/Amsterdam";
+      const reminderChoice = document.getElementById('reminders-select').value;
+
+      let lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//DocToCalendar Web App//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        `X-WR-CALNAME:${calName}`,
+        `X-WR-TIMEZONE:${tz}`
+      ];
+
+      const now = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+      extractedEvents.forEach(ev => {
+        lines.push("BEGIN:VEVENT");
+        lines.push(`UID:${ev.id}@doctocalendar`);
+        lines.push(`DTSTAMP:${now}`);
+        lines.push(`SUMMARY:${ev.title.replace(/[,;]/g, '\\$&')}`);
+
+        // Date-time
+        const dtClean = ev.date.replace(/-/g, '');
+        const stClean = ev.startTime ? ev.startTime.replace(':', '') + '00' : '000000';
+        const etClean = ev.endTime ? ev.endTime.replace(':', '') + '00' : stClean;
+
+        lines.push(`DTSTART;TZID=${tz}:${dtClean}T${stClean}`);
+        lines.push(`DTEND;TZID=${tz}:${dtClean}T${etClean}`);
+        lines.push(`DESCRIPTION:${(ev.description || '').replace(/\n/g, '\\n').replace(/[,;]/g, '\\$&')}`);
+        lines.push(`LOCATION:${(ev.location || '').replace(/[,;]/g, '\\$&')}`);
+        lines.push("STATUS:CONFIRMED");
+
+        // Alarms
+        if (reminderChoice === 'standard') {
+          lines.push("BEGIN:VALARM");
+          lines.push("ACTION:DISPLAY");
+          lines.push(`DESCRIPTION:Reminder: ${ev.title.replace(/[,;]/g, '\\$&')}`);
+          lines.push("TRIGGER:-P1D");
+          lines.push("END:VALARM");
+        }
+
+        lines.push("END:VEVENT");
+      });
+
+      lines.push("END:VCALENDAR");
+
+      // Line folding
+      const folded = lines.map(l => l.length > 75 ? l.substring(0, 75) + "\r\n " + l.substring(75) : l).join("\r\n");
+
+      // Trigger download
+      const blob = new Blob([folded], { type: 'text/calendar;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${calName.replace(/\s+/g, '_')}.ics`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
