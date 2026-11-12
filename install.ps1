@@ -1,4 +1,4 @@
-﻿#
+#
 # doc-to-calendar Universal Multi-Agent Installer (Windows PowerShell)
 # Supports both:
 # 1) One-line web install: irm https://raw.githubusercontent.com/KidOBricks/doc-to-calendar/main/install.ps1 | iex
