@@ -7,8 +7,12 @@ export async function post_extractCalendar(request) {
     const body = await request.body.json();
     const apiKey = await getSecret('GEMINI_API_KEY');
 
-    // Build multimodal parts: attach base64 file data if available
+    // Use Gemini 3.8 Flash with High thinking effort
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+
     const parts = [];
+
+    // Pass the raw file (PDF or image) directly to Gemini Multimodal
     if (body.fileBase64 && body.mimeType) {
       parts.push({
         inlineData: {
@@ -18,11 +22,10 @@ export async function post_extractCalendar(request) {
       });
     }
 
-    const docText = body.text ? `\n\nDocument Content:\n${body.text.substring(0, 30000)}` : '';
-    parts.push({ text: (body.prompt || 'Extract all calendar events into a JSON array of objects.') + docText });
-
-    // Primary Call: Gemini 3.8 Flash
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+    // Add prompt and text
+    parts.push({
+      text: body.prompt + (body.text ? "\n\nExtracted Text:\n" + body.text.substring(0, 40000) : "")
+    });
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
@@ -31,13 +34,17 @@ export async function post_extractCalendar(request) {
         contents: [{ parts: parts }],
         generationConfig: {
           responseMimeType: "application/json",
-          temperature: 0.1
+          temperature: 0.1,
+          thinkingConfig: {
+            thinkingLevel: "HIGH"
+          }
         }
       })
     });
 
     const data = await response.json();
 
+    // If gemini-3.8-flash High succeeded, return directly
     if (response.ok && !data.error && data.candidates && data.candidates[0]) {
       return ok({
         headers: {
@@ -48,34 +55,28 @@ export async function post_extractCalendar(request) {
       });
     }
 
-    // Fallback: If generateContent requested Interactions API
-    if (data.error && (data.error.code === 404 || (data.error.message && data.error.message.includes('Interactions')))) {
-      const interactionsUrl = `https://generativelanguage.googleapis.com/v1beta/interactions?key=${apiKey}`;
-      const intResponse = await fetch(interactionsUrl, {
-        method: 'POST',
+    // High-availability fallback to gemini-1.5-flash if 3.8 has a temporary 503 spike
+    const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const fallbackRes = await fetch(fallbackUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: parts }],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    const fallbackData = await fallbackRes.json();
+    if (fallbackRes.ok && !fallbackData.error && fallbackData.candidates && fallbackData.candidates[0]) {
+      return ok({
         headers: {
           'Content-Type': 'application/json',
-          'Api-Revision': '2026-05-20'
+          'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({
-          model: 'gemini-3.8-flash',
-          input: body.prompt + docText,
-          generation_config: {
-            temperature: 0.1
-          }
-        })
+        body: fallbackData
       });
-
-      const intData = await intResponse.json();
-      if (intResponse.ok && !intData.error) {
-        return ok({
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          },
-          body: intData
-        });
-      }
     }
 
     return serverError({
@@ -83,7 +84,7 @@ export async function post_extractCalendar(request) {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: { error: data.error || { message: `Gemini status ${response.status}` } }
+      body: { error: data.error || fallbackData.error || { message: `Status ${response.status}` } }
     });
   } catch (err) {
     return serverError({
