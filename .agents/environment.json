@@ -1,0 +1,3 @@
+{
+  "install": "python3 -m py_compile scripts/generate_ics.py scripts/push_to_gcalendar.py && python3 scripts/generate_ics.py -i examples/sample_syllabus_input.json >/dev/null"
+}
