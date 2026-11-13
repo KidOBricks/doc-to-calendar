@@ -1,24 +1,21 @@
 ---
-description: Extracts events, deadlines, exams, and holidays from uploaded schedules and syllabi into .ics calendar files
+description: Extracts events, deadlines, exams, meetings, flights, and holidays from documents, images/screenshots, or pasted text into .ics files or Google Calendar
 globs: *
 alwaysApply: false
 ---
 
-# Document-to-Calendar Rule (`doc-to-calendar`)
+# Universal Doc-to-Calendar Rule (`doc-to-calendar`)
 
-When the user asks to extract deadlines, exams, meetings, or schedules from a document (PDF, Word, syllabus, Markdown):
+When the user asks to extract dates, deadlines, exams, meetings, itineraries, or schedules from a document (PDF, DOCX, TXT, MD, CSV, HTML, ICS), **an image/screenshot** (PNG, JPG, WEBP), or **pasted text/notes**:
 
-1. **Ingest Document**: Read the document and extract dates, times, deadlines, grading breakdown, and locations.
-2. **Interactive Clarification**:
-   - Ask scope preference (Full schedule vs. Deadlines only).
-   - Ask student cohort/track (e.g. Bachelor vs. Master) and tutorial slot.
-   - Ask preferred time for deadlines without explicit hours (default 23:59).
-   - Ask category labels (Full: `DEADLINE`, `MEETING` vs. Short: `DDL`, `MEET` vs. Custom: `DUE`, `CLASS`).
-   - Ask alarm preferences (e.g. 1 day, 2 hours before).
-   - Ask for optional short code prefix (e.g. `CS101`, `BUS`).
-   - Ask for output `.ics` filename.
-3. **Format Titles**:
+1. **Detect Mode**:
+   - **`quick` mode** (`quick`, `--quick`, `"fast"`, `"auto"`): Skip clarification questions. Auto-apply optimal defaults (All key events, shortened tags `DDL`/`XM`/`MTG`/`LEC`/`HOL`/`FLIGHT`, `23:59` for date-only deadlines, All-Day for date-only holidays/events, smart alarms `-P1D`/`-PT2H` for deadlines and `-PT30M` for meetings, auto-detected timezone). Immediately generate `.ics` (and push to Google Calendar if `gcal` was requested).
+   - **Standard mode**: Ask one compact clarification batch covering scope, cohorts/tracks (if ambiguous), missing times, category labels, alarms, short code, filename, AND **Google Calendar options** (`.ics` vs. direct Google Calendar sync vs. both, existing vs. new calendar, and per-category colors 1–11).
+2. **Format Titles**:
    `[SHORT CODE - ]CATEGORY - Event Title`
-4. **Generate RFC 5545 `.ics` File**:
-   Run `python scripts/generate_ics.py -i <json_file> -o <filename>.ics`
-5. **Deliver Preview & Download**: Display preview Markdown table and link the output `.ics` file.
+3. **Generate RFC 5545 `.ics` File**:
+   `python scripts/generate_ics.py -i <json_file> -o <filename>.ics`
+4. **Optional Direct Google Calendar Push**:
+   - Inspect calendars: `python scripts/push_to_gcalendar.py --list-calendars`
+   - Push with per-category colors: `python scripts/push_to_gcalendar.py -i <json_file> --cal "<id_or_name>" --color-map "DDL=11,EXAM=4,LEC=9,HOL=2"`
+5. **Deliver Preview & Links**: Display the Markdown staging table, link any `.ics` file, and share Google Calendar event links.

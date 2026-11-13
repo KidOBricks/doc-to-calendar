@@ -1,11 +1,11 @@
 {
   "name": "doc-to-calendar",
   "displayName": "Doc to Calendar",
-  "version": "1.0.0",
-  "description": "Extract deadlines, exams, lectures, and events from uploaded syllabi and documents into downloadable .ics calendar files.",
+  "version": "1.2.0",
+  "description": "Universal calendar extractor. Ingests documents (PDF, DOCX, TXT, MD, CSV, ICS), images/screenshots, or pasted text; supports a zero-prompt `quick` mode; generates RFC 5545 .ics files; and syncs directly to existing or new Google Calendars with per-category colors.",
   "suggestedPrompts": [
-    "/doc-to-calendar Extract all events from this course syllabus",
-    "/doc-to-calendar Parse deadlines and exams from the attached PDF",
-    "/doc-to-calendar Convert schedule document to Google Calendar .ics"
+    "/doc-to-calendar Extract events from this document or screenshot",
+    "/doc-to-calendar quick Turn these pasted notes into a calendar",
+    "/doc-to-calendar Add this syllabus to Google Calendar with custom colors per category"
   ]
 }

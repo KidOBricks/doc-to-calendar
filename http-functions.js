@@ -12,8 +12,9 @@ export async function post_extractCalendar(request) {
 
     const parts = [];
 
-    // Pass the raw file (PDF or image) directly to Gemini Multimodal
-    if (body.fileBase64 && body.mimeType) {
+    // Pass inlineData ONLY for Gemini-supported binary multimodal MIME types (PDF and images)
+    const mime = (body.mimeType || '').toLowerCase();
+    if (body.fileBase64 && (mime === 'application/pdf' || mime.startsWith('image/'))) {
       parts.push({
         inlineData: {
           mimeType: body.mimeType,
@@ -22,9 +23,10 @@ export async function post_extractCalendar(request) {
       });
     }
 
-    // Add prompt and text
+    // Add prompt and extracted/pasted text
+    const textSnippet = body.text ? "\n\nDocument / Pasted Content:\n" + body.text.substring(0, 60000) : "";
     parts.push({
-      text: body.prompt + (body.text ? "\n\nExtracted Text:\n" + body.text.substring(0, 40000) : "")
+      text: (body.prompt || "Extract calendar events as JSON.") + textSnippet
     });
 
     const response = await fetch(geminiUrl, {
@@ -55,8 +57,8 @@ export async function post_extractCalendar(request) {
       });
     }
 
-    // High-availability fallback to gemini-1.5-flash if 3.8 has a temporary 503 spike
-    const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // Fast fallback to gemini-2.5-flash / gemini-1.5-flash if 3.8 has a temporary spike
+    const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
     const fallbackRes = await fetch(fallbackUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

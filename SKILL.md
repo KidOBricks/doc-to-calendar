@@ -1,177 +1,209 @@
 ---
 name: doc-to-calendar
 description: >-
-  Extracts events, deadlines, exams, lectures, and holidays from uploaded documents (PDF, DOCX,
-  academic syllabi, course schedules, project roadmaps), conducts interactive clarification
-  (cohorts, missing times, alarms, short codes), formats titles with standard tags
-  ('[SHORT CODE - ]CATEGORY - Event Title'), and generates an RFC 5545 compliant .ics file
-  for Google Calendar and calendar apps.
+  Universal calendar extractor. Extracts events, deadlines, exams, meetings, flights, and
+  holidays from documents (PDF, DOCX, TXT, MD, CSV, ICS), images/screenshots (PNG, JPG, WEBP),
+  or pasted text/notes. Supports a zero-prompt `quick` mode with optimal auto-settings, interactive
+  clarification (scope, cohorts, missing times, alarms, custom category tags, short codes),
+  RFC 5545 .ics export, and direct Google Calendar sync with per-category colors and calendar selection.
 ---
 
-# Document-to-Calendar Extractor (`doc-to-calendar`)
+# Universal Doc-to-Calendar Extractor (`doc-to-calendar`)
 
-Use this skill whenever the user uploads or points to a document (such as a course syllabus, university calendar, academic schedule, conference itinerary, or project timeline in PDF, Word, or text format) and requests to extract deadlines, exams, sessions, or events into a downloadable calendar file (`.ics`).
+Use this skill whenever the user attaches a document or image, pastes text/notes, or points to a schedule and wants events extracted into an RFC 5545 `.ics` file and/or pushed directly to **Google Calendar**.
+
+---
+
+## Invocation Modes & Arguments
+
+Check the user's message for mode flags before starting:
+
+### ⚡ Quick Mode (`quick`, `--quick`, `"fast"`, `"auto"`)
+If the user invokes `/doc-to-calendar quick` (or includes `--quick`, `quick`, `auto`, `fast` as an argument/intent):
+- **SKIP Step 3 (Interactive Clarification) completely.**
+- Apply the **Optimal Auto-Settings** immediately:
+  - **Scope**: All key events, deadlines, exams, milestones, meetings, flights/travel, and holidays (if multiple tracks/sections appear and none is specified, include shared events and label section variants clearly in titles).
+  - **Short Code**: Auto-infer a clean 2–6 character uppercase code if obvious from context (e.g., `CS101`, `LAUNCH`, `TRIP`, `WORK`), otherwise omit.
+  - **Category Labels**: Shortened codes (`DDL`, `XM`, `MTG`, `LEC`, `TUT`, `HOL`, `MILE`, `FLIGHT`, `EVT`, `ADM`).
+  - **Missing Times**: `23:59` for `DDL` (deadlines) without a time; **All-Day** (`YYYY-MM-DD`) for `HOL`/`EVT`/`FLIGHT` date-only entries without a time; `09:00` (1h) for timed meetings missing hours.
+  - **Timezone**: Detect via `gcalendar readonly working-hours --json` (if available), else document timezone, else local OS timezone.
+  - **Alarms**: Smart category alarms (`DDL`/`XM`: `-1440, -120`; `MTG`/`LEC`/`TUT`/`EVT`: `-30`; `FLIGHT`: `-180`; `HOL`: `[]`).
+  - **Destination**:
+    - Default in `quick` mode: Generate the `.ics` file immediately and show the preview table + summary of auto-applied settings.
+    - If the user also specified Google Calendar in quick mode (e.g., `/doc-to-calendar quick gcal` or `"quick add to google calendar"`): Push straight to their `primary` calendar (or named calendar if specified) using the **Recommended Google Calendar Color Palette** below!
+
+### 🎛️ Standard Interactive Mode (Default)
+Run the full 5-stage workflow with a **single compact clarification step** so the user gets full customization with minimal back-and-forth.
 
 ---
 
 ## Workflow Overview
 
-Follow this 5-stage workflow strictly:
-
-```
-1. Ingest & Parse Document
+```text
+1. Ingest Input (Documents / Images & Screenshots / Pasted Text)
         │
         ▼
-2. Analyze & Stage Candidates
+2. Analyze, Categorize & Stage Candidates
         │
         ▼
-3. Interactive Clarification Phase (Ask User)
+3. Interactive Clarification (SKIP if `quick` mode)
+        │  └─ Scope, Missing Times, Category Style, Alarms, Short Code,
+        │     Destination (.ics vs Google Calendar, Calendar & Colors)
+        ▼
+4. Preview Table
         │
         ▼
-4. Event Staging Preview Table
-        │
-        ▼
-5. Generate .ics & Deliver Download Link
+5. Generate .ics &/or Push to Google Calendar with Category Colors
 ```
 
 ---
 
-## Step 1: Ingest & Parse Document
+## Step 1: Ingest Input (All Modalities Supported)
 
-1. Read the document using `read_file` or relevant file inspection tools.
-2. Carefully inspect all sections:
-   - **Weekly schedule tables** (maps week numbers, lecture dates, assignment due dates).
-   - **Grading & Assessment breakdown** (percentages, deliverable descriptions).
-   - **Academic calendar / Key dates** (term start, drop/add, holidays, reading weeks, finals).
-   - **Administrative details** (locations, room numbers, online links, office hours).
+Accept any of the following inputs seamlessly:
+1. **Documents**: `.pdf`, `.docx`, `.doc`, `.txt`, `.md`, `.csv`, `.tsv`, `.html`, `.ics`, `.json` — inspect via `read_file` or Python extraction.
+2. **Images & Screenshots**: `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.bmp` (screenshots of portals/emails, event flyers, Instagram posts, handwritten whiteboards, timetable images) — inspect directly with vision (`read_file` on image path or attached chat image), preserving rows, columns, and color cues.
+3. **Pasted Text / Unstructured Notes**: Direct chat text, email threads, Slack/WhatsApp dumps, copied web tables, or bulleted itineraries. No file attachment required.
+
+Inspect carefully across all sections:
+- Schedule tables, date headers, multi-line cells
+- Deadlines, assessments, grading weights, deliverables
+- Travel itineraries, flight numbers, check-in windows
+- Holidays, closures, cohorts/tracks, recurring slots, room numbers, and URLs.
 
 ---
 
 ## Step 2: Analyze & Stage Candidates
 
-Identify each prospective calendar entry and categorize it into one of the standard categories:
-- `DEADLINE`: Assignment submissions, problem sets, projects, essay deadlines.
-- `EXAM`: Midterms, final exams, quizzes, practicals, presentations.
-- `LECTURE`: Regular class sessions, guest lectures, course meetings.
-- `TUTORIAL`: Recitations, lab practicals, exercise sessions, workshops.
-- `HOLIDAY`: Breaks, vacations, university closures, bank holidays.
-- `MILESTONE`: Proposal draft hand-in, peer review window, checkpoints.
-- `ADMIN`: Course add/drop deadlines, registration windows, tuition deadlines.
+Categorize each event into standard categories (adapting naturally to academic, work, travel, or personal contexts):
+- `DEADLINE` (`DDL` / `DUE`): Submissions, assignments, deliverables, filings, RSVPs.
+- `EXAM` (`XM`): Midterms, finals, quizzes, evaluations, defenses.
+- `MEETING` (`MTG`): Work syncs, 1:1s, doctor/client appointments, mentor calls.
+- `LECTURE` (`LEC`): Classes, keynotes, talks, webinars.
+- `TUTORIAL` (`TUT`): Labs, workshops, recitations, exercise sections.
+- `FLIGHT` (`FLIGHT`): Flights, trains, check-in/out, transit legs.
+- `MILESTONE` (`MILE`): Checkpoints, launches, reviews, sprints.
+- `HOLIDAY` (`HOL`): Vacations, bank holidays, closures, time off.
+- `EVENT` (`EVT`): Social events, conferences, parties, general entries.
+- `ADMIN` (`ADM`): Registrations, enrollments, billing/admin windows.
 
-For each event, construct a **rich description**:
-- **Deliverable / Topic**: Exactly what is due or covered.
-- **Grading Weight**: e.g., *"Worth 20% of final grade"*.
-- **Submission Portal**: e.g., Canvas, Gradescope, email, portal link.
-- **Location**: Building/room number or virtual meeting link.
-- **Required Prep**: Relevant chapters, reading assignments.
-
----
-
-## Step 3: Interactive Clarification Phase (Required)
-
-Before generating the final `.ics` file, **ask the user targeted questions** using `ask_question` or direct chat to resolve ambiguities:
-
-1. **Extraction Scope**:
-   - Ask whether they want the **full schedule** (lectures + tutorials + deadlines) or **deadlines, exams, milestones, and holidays only**.
-2. **Cohorts & Tracks Disambiguation**:
-   - If the document contains Bachelor vs. Master streams, undergraduate vs. graduate deadlines, or separate tracks/electives, ask which applies to them.
-3. **Tutorial / Lab Timeslot Selection**:
-   - If the syllabus lists multiple recurring lab/tutorial groups (e.g., *Group A on Tuesdays vs. Group B on Thursdays*), ask which section they are enrolled in.
-4. **Missing Deadline Times**:
-   - For any deadline where the document specifies a date without an exact hour (or says "midnight"), ask what time they want it set to (e.g., `23:59`).
-5. **Category Labels Customization**:
-   - Explicitly list the detected categories in the document (e.g., *"I found the following categories: DEADLINE, MEETING, LECTURE"*).
-   - Ask how the user would like these category labels displayed in the event titles:
-     1. **Full Category Names** (e.g., `DEADLINE`, `MEETING`, `LECTURE`, `EXAM`)
-     2. **Shortened Codes** (e.g., `DL`, `MTG`, `LEC`, `XM`)
-     3. **Custom Labels (You pick)**: Allow the user to specify custom labels for any or all categories (e.g., `DUE` instead of `DEADLINE`, `CLASS` instead of `LECTURE`, `RUBRIC` for grading deadlines).
-6. **Reminders & Alarms Preference**:
-   - Ask what notification alerts they prefer embedded in the `.ics` (e.g., *1 day before + 2 hours before for deadlines*, *15 minutes before classes*, or *none*).
-7. **Course / Context Short Code**:
-   - Ask if they would like an optional short prefix prepended to all event titles (e.g., `BUS` for Business, `TU/e` for University-wide, `CS101`, `PIV2`).
-8. **Output Filename**:
-   - Ask what they want the output `.ics` file to be named (e.g., `CourseName_Deadlines.ics`).
-9. **Timezone Confirmation**:
-   - If the document specifies a different timezone or doesn't mention one, confirm the appropriate timezone (e.g., `Europe/Amsterdam`).
+Construct rich descriptions where available:
+- 📌 **Details / Deliverable**
+- ⚖️ **Weight / Priority** (e.g., *Worth 20% of grade*)
+- 🔗 **Portal / Meeting Link**
+- 📍 **Location / Room**
+- 📚 **Prep / Readings / Notes**
 
 ---
 
-## Step 4: Title Formatting & Preview
+## Step 3: Interactive Clarification Phase (Skip in `quick` mode)
 
-### Event Title Formula
-Format every event title as:
+Before generating output, ask **one compact, well-structured set of questions** (using `ask_question` when helpful, or clear bulleted choices in chat) covering only what is actually ambiguous or needed:
+
+1. **Extraction Scope**: Full schedule vs. Key deadlines/exams/milestones only (or specific category filter).
+2. **Cohorts, Tracks & Groups** *(only if detected in input)*: Ask which stream (e.g., Bachelor vs. Master) or lab/tutorial group applies.
+3. **Missing Times & All-Day Preference**: For date-only deadlines without an explicit hour, ask preferred time (default `23:59`, e.g., `18:00`, or All-Day).
+4. **Category Label Style & Short Code**:
+   - Labels: **Shortened** (`DDL`, `XM`, `MTG`, `EVT` — Recommended), **Full** (`DEADLINE`, `EXAM`, `MEETING`), or **Custom** (e.g., `DUE`, `CLASS`).
+   - Optional short prefix (e.g., `CS101`, `TRIP`, `WORK`).
+5. **Embedded Reminders / Alarms**: Recommend `-P1D` + `-PT2H` for deadlines/exams and `-PT30M` for meetings/sessions (or custom / none).
+6. **Timezone & Output Name**: Confirm timezone (auto-detected) and `.ics` filename / calendar name.
+7. **Google Calendar Sync & Category Colors**:
+   - Ask destination: **Download `.ics` only**, **Add directly to Google Calendar**, or **Both**?
+   - If Google Calendar is chosen (or user expressed interest):
+     1. Run `python "<skill_dir>/scripts/push_to_gcalendar.py" --list-calendars` to inspect their existing Google Calendars.
+     2. Ask **Target Calendar**:
+        - Choose an **existing calendar** by name (list their calendars cleanly), **OR**
+        - **Create a new calendar**: Give them the 1-click Google Calendar creation link `https://calendar.google.com/calendar/r/settings/createcalendar` (once they create & name it and confirm, re-run `--list-calendars` to fetch its ID and push all events!).
+     3. Ask **Color per Category** (list the detected categories and offer the **Recommended Palette** as #1 choice so they can approve in 1 click or customize any category):
+
+| Color ID | Google Calendar Color | Swatch | Recommended Default For |
+| :--- | :--- | :--- | :--- |
+| `11` | **Tomato** (Red) | `#dc2127` | `DDL` / `DEADLINE` |
+| `4` | **Flamingo** (Coral) | `#ff887c` | `EXAM` / `XM` |
+| `5` | **Banana** (Yellow) | `#fbd75b` | `MILE` / `MILESTONE` |
+| `6` | **Tangerine** (Orange) | `#ffb878` | `ADM` / `ADMIN` |
+| `9` | **Blueberry** (Blue) | `#5484ed` | `MTG` / `LEC` |
+| `7` | **Peacock** (Teal) | `#46d6db` | `TUT` / `LAB` |
+| `2` | **Sage** (Mint) | `#7ae7bf` | `HOL` / `HOLIDAY` |
+| `3` | **Grape** (Purple) | `#dbadff` | `FLIGHT` / `TRAVEL` |
+| `10` | **Basil** (Green) | `#51b749` | `EVT` / `EVENT` |
+| `1` | **Lavender** | `#a4bdfc` | Optional |
+| `8` | **Graphite** (Gray) | `#e1e1e1` | Optional |
+
+*(Note: If the `gcalendar` CLI is not available/authenticated in the user's environment, let them know and focus on generating the RFC 5545 `.ics` file plus instructions to install the Google Calendar plugin or import the `.ics`.)*
+
+---
+
+## Step 4: Title Formatting & Staging Preview
+
+Format every event title strictly as:
 ```text
 [SHORT CODE - ]CATEGORY - Event Title
 ```
 
-*Examples with short code*:
-- `BUS - DEADLINE - Assignment 1: Memo`
-- `TU/e - HOLIDAY - Spring Vacation`
-- `CS101 - EXAM - Midterm Exam`
-- `MATH - LECTURE - Linear Algebra Lecture 1`
-
-*Examples without short code*:
-- `DEADLINE - Final Project Submission`
-- `EXAM - Final Exam`
-- `HOLIDAY - Summer Break`
-
-### Preview Table
-Present a clear Markdown table for the user:
+Display a clear Markdown preview table before finalizing:
 ```markdown
-| Date | Time | Category | Title | Location / Key Details |
-| :--- | :--- | :--- | :--- | :--- |
-| 2026-11-20 | 23:59 | DEADLINE | BUS - DEADLINE - Assignment 1 | Canvas • 15% grade |
-| 2026-12-05 | 09:00 - 12:00 | EXAM | BUS - EXAM - Midterm Exam | Aud 3 • Closed book |
+| Date | Time | Category | Google Color | Title | Location / Notes |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 2026-11-20 | 23:59 | DDL | Tomato (11) | BUS - DDL - Assignment 1 | Canvas • 15% |
 ```
 
 ---
 
-## Step 5: Generate the RFC 5545 `.ics` File
+## Step 5: Generate `.ics` and/or Push to Google Calendar
 
-Use the bundled generator script to output a 100% compliant `.ics` file:
+Resolve the skill's `scripts/` directory dynamically (where `SKILL.md` lives, e.g., `~/.gemini/config/plugins/doc-to-calendar/skills/doc-to-calendar/scripts/`, `~/.claude/skills/doc-to-calendar/scripts/`, or workspace `.agents/skills/doc-to-calendar/scripts/`).
 
-```powershell
-python "C:\Users\20230928\.gemini\config\skills\doc-to-calendar\scripts\generate_ics.py" -i "staged_events.json" -o "<chosen_filename>.ics"
+### 5A. Generate RFC 5545 `.ics` File
+```bash
+python "<skill_dir>/scripts/generate_ics.py" -i "staged_events.json" -o "<chosen_filename>.ics"
 ```
 
-Or pass the JSON payload directly via stdin:
-```powershell
-$jsonPayload | python "C:\Users\20230928\.gemini\config\skills\doc-to-calendar\scripts\generate_ics.py" -o "<chosen_filename>.ics"
-```
-
-### JSON Structure for the Generator:
+#### Staged JSON Schema:
 ```json
 {
-  "calendar_name": "Course Schedule",
+  "calendar_name": "My Schedule",
   "timezone": "Europe/Amsterdam",
   "default_reminders": [-1440, -120],
+  "category_colors": {
+    "DDL": "11",
+    "EXAM": "4",
+    "LEC": "9",
+    "HOL": "2"
+  },
   "events": [
     {
-      "title": "BUS - DEADLINE - Assignment 1",
+      "title": "BUS - DDL - Assignment 1",
       "start": "2026-11-20T23:59:00",
       "end": "2026-11-20T23:59:00",
-      "description": "Submit via Canvas.\nWorth 15% of final grade.\nReadings: Chapter 3 & 4.",
+      "description": "Submit via Canvas.\nWorth 15% of final grade.",
       "location": "Canvas",
-      "category": "DEADLINE",
+      "category": "DDL",
       "reminders": [-1440, -120]
     },
     {
-      "title": "TU/e - HOLIDAY - Winter Break",
+      "title": "BUS - HOL - Winter Break",
       "start": "2026-12-24",
       "end": "2027-01-08",
-      "description": "University campus closed.",
-      "category": "HOLIDAY",
+      "description": "Closed for holidays.",
+      "category": "HOL",
       "reminders": []
     }
   ]
 }
 ```
 
-### Final Delivery
-Provide the user with a clickable `file://` link to the generated `.ics` file:
-```markdown
-Your calendar file has been created:
-👉 [Download <filename>.ics](file:///<absolute-path-to-file>)
-
-You can double-click this file on your computer or import it into Google Calendar via **Settings > Import & export**.
+### 5B. Push Directly to Google Calendar (Optional / User Requested)
+1. Ensure the `gcalendar` CLI is initialized (run `<gcalendar_skill>/scripts/gcalendar --version` once if needed, then always invoke bare `gcalendar`).
+2. Before writing to an existing calendar, inspect relevant dates with `gcalendar readonly events --cal "<cal_id>" --start ... --end ...` if checking for duplicates or conflicts.
+3. Run the bundled Google Calendar pusher script (supports calendar **ID** or exact **Calendar Name**, plus `--color-map` with numeric IDs or color names like `DDL=Tomato,EXAM=4,LEC=Blueberry`):
+```bash
+python "<skill_dir>/scripts/push_to_gcalendar.py" -i "staged_events.json" --cal "<calendar_id_or_name>" --color-map "DDL=11,EXAM=4,LEC=9,HOL=2"
 ```
+*(Add `--dry-run` first if verifying timestamps/colors, or `--account <email>` if multiple accounts are connected.)*
+
+### Final Delivery
+- Provide a clickable `file:///` link to any generated `.ics` file.
+- Print every created Google Calendar event's clickable `Link:` URL and confirm target calendar + color assignments.
+- Clean up any temporary intermediate JSON files if created in scratch directories unless requested otherwise.

@@ -42,7 +42,7 @@ def rfc5545_fold_line(line: str, max_octets: int = 75) -> str:
     return "\r\n".join(chunks)
 
 def escape_text(text: str) -> str:
-    """
+    r"""
     Escapes special characters in text values per RFC 5545 section 3.3.11.
     Backslash (\) -> \\
     Semicolon (;) -> \;
@@ -177,6 +177,8 @@ def generate_ics(data: dict) -> str:
                 end_is_date = False
 
         if start_is_date:
+            if end_dt <= start_dt:
+                end_dt = start_dt + datetime.timedelta(days=1)
             lines.append(f"DTSTART;VALUE=DATE:{start_dt.strftime('%Y%m%d')}")
             lines.append(f"DTEND;VALUE=DATE:{end_dt.strftime('%Y%m%d')}")
         else:

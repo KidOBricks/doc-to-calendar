@@ -30,7 +30,7 @@
       font-style: italic;
       font-weight: 400;
       font-display: swap;
-      src: url('https://static.wixstatic.com/ufonts/000ada_62006f349368480cb6f98d4f10520c14/woff2/file.woff2') format('woff2');
+      src: url('https://static.wixstatic.com/ufonts/000ada_62006f349368480cb98d4f10520c14/woff2/file.woff2') format('woff2');
     }
     @font-face {
       font-family: 'Alata';
@@ -68,7 +68,6 @@
       background-color: #F4F6FF !important;
     }
 
-    /* Custom scrollbars */
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
@@ -86,8 +85,8 @@
   </style>
 </head>
 <body class="min-h-screen bg-white">
-  <div class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-    
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+
     <!-- Zyfn Style Header -->
     <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-8 mb-8 border-b border-neutral-200 gap-4">
       <div>
@@ -98,11 +97,11 @@
           Doc to Calendar<span class="text-[#1F3FD0]">.</span>
         </h1>
         <p class="text-xs sm:text-sm text-neutral-500 mt-1.5 font-normal">
-          Extract deadlines, schedules, flights, and itineraries into universal calendar files (.ics)
+          Extract deadlines, schedules, flights, and itineraries from documents, images, or pasted notes into .ics or Google Calendar
         </p>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <span class="px-3.5 py-1.5 bg-[#F4F6FF] text-[#1F3FD0] border border-[#1F3FD0]/20 rounded-full text-xs font-semibold flex items-center space-x-1.5">
           <span class="w-2 h-2 rounded-full bg-[#1F3FD0] animate-pulse"></span>
           <span>Gemini 3.8 Flash High</span>
@@ -125,28 +124,35 @@
     <!-- Main Content Area -->
     <main class="space-y-8">
 
-      <!-- Step 1: Upload or Paste Document -->
+      <!-- Step 1: Upload or Paste Document / Image / Notes -->
       <section class="bg-white rounded-2xl border border-neutral-200 p-6 sm:p-7 shadow-sm hover:shadow-md transition-shadow">
-        <h2 class="font-heading text-lg font-bold text-neutral-900 mb-5 flex items-center">
-          <span class="w-6 h-6 rounded-full bg-[#1F3FD0] text-white flex items-center justify-center text-xs font-bold mr-2.5">1</span>
-          Upload Document, Schedule, or Flyer<span class="text-[#1F3FD0]">.</span>
-        </h2>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <h2 class="font-heading text-lg font-bold text-neutral-900 flex items-center">
+            <span class="w-6 h-6 rounded-full bg-[#1F3FD0] text-white flex items-center justify-center text-xs font-bold mr-2.5">1</span>
+            Upload File, Screenshot, or Paste Notes<span class="text-[#1F3FD0]">.</span>
+          </h2>
+          <button id="quick-extract-top-btn" onclick="quickExtract()" class="px-4 py-2 bg-[#E423B4]/10 hover:bg-[#E423B4]/20 text-[#E423B4] border border-[#E423B4]/30 font-bold text-xs rounded-xl transition-all flex items-center space-x-1.5" title="Skips manual config, applies optimal settings automatically, and downloads .ics">
+            <span>⚡ Quick Extract (Auto Best Settings)</span>
+          </button>
+        </div>
 
         <!-- Mode Tabs -->
         <div class="flex border-b border-neutral-200 mb-5 text-xs font-semibold">
-          <button id="tab-upload" onclick="switchTab('upload')" class="py-2.5 px-4 border-b-2 border-[#1F3FD0] text-[#1F3FD0]">File & Screenshot</button>
+          <button id="tab-upload" onclick="switchTab('upload')" class="py-2.5 px-4 border-b-2 border-[#1F3FD0] text-[#1F3FD0]">File &amp; Image / Screenshot</button>
           <button id="tab-paste" onclick="switchTab('paste')" class="py-2.5 px-4 border-b-2 border-transparent text-neutral-500 hover:text-neutral-800">Paste Text / Notes</button>
         </div>
 
         <!-- Upload Pane -->
         <div id="pane-upload">
           <div id="dropzone" class="border-2 border-dashed border-neutral-300 rounded-2xl p-8 sm:p-10 text-center hover:border-[#1F3FD0] hover:bg-[#FAFBFD] transition-all cursor-pointer">
-            <input type="file" id="file-input" class="hidden" accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg,.webp,.bmp" />
-            <div class="text-4xl mb-3">📄 🖼️</div>
-            <p class="text-sm font-semibold text-neutral-800">Drag & drop your file or screenshot here, or <span class="text-[#1F3FD0] hover:underline">browse</span></p>
-            <p class="text-xs text-neutral-400 mt-1">Supports PDF study guides, Word (.docx), Screenshots & Photos (PNG/JPG), Travel itineraries, Syllabus tables</p>
+            <input type="file" id="file-input" class="hidden" accept=".pdf,.docx,.doc,.txt,.md,.csv,.tsv,.ics,.html,.htm,.json,.rtf,.png,.jpg,.jpeg,.webp,.bmp,.gif" />
+            <div class="text-4xl mb-3">📄 🖼️ 📋</div>
+            <p class="text-sm font-semibold text-neutral-800">
+              Drag &amp; drop a file/image, <span class="text-[#1F3FD0] hover:underline">browse</span>, or press <kbd class="px-1.5 py-0.5 bg-neutral-100 border border-neutral-300 rounded text-[11px] font-mono">Ctrl+V</kbd> to paste a screenshot
+            </p>
+            <p class="text-xs text-neutral-400 mt-1.5">Supports PDF, Word (.docx), Screenshots &amp; Photos (PNG/JPG/WEBP), CSV, Markdown, HTML, and existing .ics files</p>
           </div>
-          
+
           <!-- OCR Progress Bar for Images -->
           <div id="ocr-progress" class="hidden mt-4 p-4 bg-[#F4F6FF] border border-[#1F3FD0]/20 rounded-xl space-y-2">
             <div class="flex justify-between text-xs font-semibold text-[#1F3FD0]">
@@ -158,29 +164,36 @@
             </div>
           </div>
 
-          <div id="file-info" class="hidden mt-4 p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl flex items-center justify-between text-xs">
-            <div class="flex items-center space-x-2">
-              <span class="text-[#1F3FD0] font-bold">📎 <span id="file-name"></span></span>
-              <span class="text-neutral-400" id="file-size"></span>
-              <span id="file-type-badge" class="px-2 py-0.5 bg-neutral-200 text-neutral-700 rounded font-semibold text-[10px]"></span>
-              <span id="file-status-badge" class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-semibold text-[10px]">Ready</span>
+          <div id="file-info" class="hidden mt-4 p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl flex items-center justify-between text-xs gap-3">
+            <div class="flex items-center space-x-3 min-w-0">
+              <img id="image-preview" class="hidden w-12 h-12 object-cover rounded-lg border border-neutral-300 shrink-0" alt="Uploaded screenshot preview" />
+              <div class="flex flex-wrap items-center gap-2 min-w-0">
+                <span class="text-[#1F3FD0] font-bold truncate">📎 <span id="file-name"></span></span>
+                <span class="text-neutral-400 shrink-0" id="file-size"></span>
+                <span id="file-type-badge" class="px-2 py-0.5 bg-neutral-200 text-neutral-700 rounded font-semibold text-[10px] shrink-0"></span>
+                <span id="file-status-badge" class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-semibold text-[10px] shrink-0">Ready</span>
+              </div>
             </div>
-            <button onclick="clearFile()" class="text-xs text-red-500 hover:text-red-700 font-semibold">Remove File</button>
+            <button onclick="clearFile()" class="text-xs text-red-500 hover:text-red-700 font-semibold shrink-0">Remove</button>
           </div>
         </div>
 
         <!-- Paste Pane -->
-        <div id="pane-paste" class="hidden">
-          <textarea id="text-input" rows="7" class="w-full p-4 border border-neutral-300 rounded-xl text-xs leading-relaxed focus:ring-2 focus:ring-[#1F3FD0] focus:outline-none" placeholder="Paste schedule table, flight details, launch roadmap, or syllabus text here..."></textarea>
+        <div id="pane-paste" class="hidden space-y-2">
+          <textarea id="text-input" rows="7" class="w-full p-4 border border-neutral-300 rounded-xl text-xs leading-relaxed focus:ring-2 focus:ring-[#1F3FD0] focus:outline-none" placeholder="Paste any text here — emails, course syllabus tables, flight itineraries, Slack/WhatsApp notes, CSV rows, or event lists..."></textarea>
+          <p class="text-[11px] text-neutral-400">Tip: You can also paste an image screenshot directly using <kbd class="px-1 py-0.5 bg-neutral-100 border border-neutral-300 rounded text-[10px]">Ctrl+V</kbd>.</p>
         </div>
       </section>
 
       <!-- Step 2: Calendar & Event Formatting -->
       <section class="bg-white rounded-2xl border border-neutral-200 p-6 sm:p-7 shadow-sm hover:shadow-md transition-shadow">
-        <h2 class="font-heading text-lg font-bold text-neutral-900 mb-5 flex items-center">
-          <span class="w-6 h-6 rounded-full bg-[#1F3FD0] text-white flex items-center justify-center text-xs font-bold mr-2.5">2</span>
-          Calendar & Event Formatting<span class="text-[#1F3FD0]">.</span>
-        </h2>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
+          <h2 class="font-heading text-lg font-bold text-neutral-900 flex items-center">
+            <span class="w-6 h-6 rounded-full bg-[#1F3FD0] text-white flex items-center justify-center text-xs font-bold mr-2.5">2</span>
+            Calendar &amp; Event Formatting<span class="text-[#1F3FD0]">.</span>
+          </h2>
+          <span class="text-[11px] text-neutral-400">Optional — or use ⚡ Quick Extract for instant smart defaults</span>
+        </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
           <!-- Short Code -->
@@ -205,10 +218,10 @@
           <div>
             <label class="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">Extraction Scope</label>
             <select id="scope-select" class="w-full px-3.5 py-2.5 border border-neutral-300 rounded-xl text-xs focus:ring-2 focus:ring-[#1F3FD0] focus:outline-none bg-white">
-              <option value="all" selected>All Events, Dates & Milestones</option>
-              <option value="deadlines">Key Deadlines & Deliverables Only</option>
-              <option value="meetings">Meetings, Lectures & Calls Only</option>
-              <option value="travel">Flights & Travel Itinerary Only</option>
+              <option value="all" selected>All Events, Dates &amp; Milestones</option>
+              <option value="deadlines">Key Deadlines &amp; Deliverables Only</option>
+              <option value="meetings">Meetings, Lectures &amp; Calls Only</option>
+              <option value="travel">Flights &amp; Travel Itinerary Only</option>
             </select>
             <p class="text-[11px] text-neutral-400 mt-1">Focus on specific event types if desired</p>
           </div>
@@ -217,7 +230,7 @@
           <div>
             <label class="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">Default Event Time</label>
             <div class="space-y-2">
-              <input type="time" id="default-time" class="w-full px-3.5 py-2.5 border border-neutral-300 rounded-xl text-xs focus:ring-2 focus:ring-[#1F3FD0] focus:outline-none" value="18:00" />
+              <input type="time" id="default-time" class="w-full px-3.5 py-2.5 border border-neutral-300 rounded-xl text-xs focus:ring-2 focus:ring-[#1F3FD0] focus:outline-none" value="23:59" />
               <label class="flex items-center space-x-2 text-xs text-neutral-600 cursor-pointer">
                 <input type="checkbox" id="all-day-checkbox" onchange="toggleAllDay(this.checked)" class="rounded text-[#1F3FD0] focus:ring-[#1F3FD0] w-4 h-4" />
                 <span class="font-medium">Default to All-Day events (no specific hour)</span>
@@ -260,7 +273,7 @@
           <div class="flex items-center justify-between mb-3">
             <div>
               <h3 class="text-xs font-bold text-neutral-800 uppercase tracking-wider">Embedded Calendar Alarms</h3>
-              <p class="text-xs text-neutral-500">Configure reminder alarms written directly into the RFC 5545 .ics file.</p>
+              <p class="text-xs text-neutral-500">Configure reminder alarms written into the .ics file and Google Calendar sync.</p>
             </div>
             <button type="button" onclick="addAlarmRow()" class="px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-semibold rounded-lg flex items-center space-x-1 transition-all">
               <span>+ Add Alarm</span>
@@ -272,34 +285,119 @@
           </div>
         </div>
 
-        <!-- Extract Action Button -->
-        <div class="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-neutral-100">
+        <!-- Extract Action Buttons -->
+        <div class="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-neutral-100">
           <p class="text-xs text-neutral-500">
-            Click extract to analyze the document with Gemini 3.8 Flash High and build your calendar.
+            Analyze your file, image, or pasted notes with Gemini 3.8 Flash High.
           </p>
-          <button id="extract-btn" onclick="startExtraction()" class="w-full sm:w-auto px-8 py-3.5 bg-[#1F3FD0] hover:bg-[#1732B0] text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center space-x-2">
-            <span>✨ Extract & Build Calendar</span>
-          </button>
+          <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+            <button onclick="quickExtract()" class="px-5 py-3.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold text-xs rounded-xl transition-all flex items-center justify-center space-x-1.5">
+              <span>⚡ Quick Auto-Download</span>
+            </button>
+            <button id="extract-btn" onclick="startExtraction()" class="flex-1 sm:flex-initial px-8 py-3.5 bg-[#1F3FD0] hover:bg-[#1732B0] text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center space-x-2">
+              <span>✨ Extract &amp; Review</span>
+            </button>
+          </div>
         </div>
       </section>
 
-      <!-- Step 3: Interactive Staging Table & Export -->
-      <section id="results-section" class="hidden bg-white rounded-2xl border border-neutral-200 p-6 sm:p-7 shadow-sm space-y-5">
+      <!-- Step 3: Interactive Staging Table, Google Calendar Colors & Export -->
+      <section id="results-section" class="hidden bg-white rounded-2xl border border-neutral-200 p-6 sm:p-7 shadow-sm space-y-6">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-neutral-200 gap-3">
           <div>
             <h2 class="font-heading text-lg font-bold text-neutral-900 flex items-center">
               <span class="w-6 h-6 rounded-full bg-[#1F3FD0] text-white flex items-center justify-center text-xs font-bold mr-2.5">3</span>
               Review Staged Calendar Events (<span id="event-count" class="text-[#1F3FD0]">0</span>)<span class="text-[#1F3FD0]">.</span>
             </h2>
-            <p class="text-xs text-neutral-500 mt-0.5">Review, edit, or adjust events before downloading your .ics file.</p>
+            <p class="text-xs text-neutral-500 mt-0.5">Edit any field, customize Google Calendar colors per category, download .ics, or sync directly.</p>
           </div>
-          <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+          <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
             <button onclick="addNewEventRow()" class="px-3.5 py-2 border border-neutral-300 hover:bg-neutral-50 text-neutral-700 text-xs font-semibold rounded-xl transition-all">
               + Add Event
             </button>
             <button onclick="downloadICS()" class="px-5 py-2.5 bg-[#25891C] hover:bg-[#1E7016] text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all flex items-center space-x-1.5">
               <span>📥 Download .ics File</span>
             </button>
+          </div>
+        </div>
+
+        <!-- Google Calendar Color Palette & Sync Card -->
+        <div class="bg-[#FAFBFD] border border-neutral-200 rounded-2xl p-5 space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 class="font-heading text-sm font-bold text-neutral-900 flex items-center space-x-2">
+                <span>🗓️ Google Calendar Sync &amp; Category Colors</span>
+              </h3>
+              <p class="text-xs text-neutral-500 mt-0.5">Choose Google Calendar colors for each category and add to an existing or brand-new calendar.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <a href="https://calendar.google.com/calendar/r/settings/createcalendar" target="_blank" class="px-3 py-1.5 bg-white hover:bg-neutral-50 border border-neutral-300 rounded-lg text-[11px] font-semibold text-neutral-700 transition-colors">
+                ➕ Create New GCal
+              </a>
+              <a href="https://calendar.google.com/calendar/r/settings/export" target="_blank" class="px-3 py-1.5 bg-white hover:bg-neutral-50 border border-neutral-300 rounded-lg text-[11px] font-semibold text-neutral-700 transition-colors">
+                📤 Import .ics in GCal
+              </a>
+            </div>
+          </div>
+
+          <!-- Per-Category Color Pickers -->
+          <div>
+            <p class="text-[11px] font-bold text-neutral-600 uppercase tracking-wider mb-2.5">Color per Category</p>
+            <div id="category-colors-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Direct Google Calendar OAuth Push Controls -->
+          <div class="pt-4 border-t border-neutral-200/80 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex flex-wrap items-center gap-2.5">
+                <button id="gcal-connect-btn" onclick="connectGoogleCalendar()" class="px-4 py-2.5 bg-[#1F3FD0] hover:bg-[#1732B0] text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center space-x-2">
+                  <span>🔗 Connect &amp; Push to Google Calendar</span>
+                </button>
+                <button onclick="toggleGcalSetup()" class="text-[11px] text-neutral-500 hover:text-neutral-800 underline font-medium">
+                  ⚙️ OAuth Client ID Setup
+                </button>
+              </div>
+              <span id="gcal-auth-status" class="text-xs text-neutral-500 font-medium hidden"></span>
+            </div>
+
+            <!-- Collapsible Client ID config -->
+            <div id="gcal-setup-box" class="hidden p-3.5 bg-white border border-neutral-200 rounded-xl text-xs space-y-2">
+              <p class="text-neutral-600">
+                To push directly from your browser into any new or existing Google Calendar with automatic category colors, enter a Google Cloud Web OAuth Client ID (authorized for this origin with Google Calendar API scope):
+              </p>
+              <div class="flex gap-2">
+                <input type="text" id="gcal-client-id" class="flex-1 px-3 py-2 border border-neutral-300 rounded-lg text-xs font-mono" placeholder="e.g. 1234567890-abcdef.apps.googleusercontent.com" />
+                <button onclick="saveGcalClientId()" class="px-4 py-2 bg-neutral-900 text-white rounded-lg font-semibold text-xs hover:bg-neutral-800">Save</button>
+              </div>
+              <p class="text-[11px] text-neutral-400">
+                Tip: If you installed the <code>doc-to-calendar</code> skill locally or run without OAuth here, you can also download the <code>.ics</code> above or click any row's 📅 quick-add button!
+              </p>
+            </div>
+
+            <!-- Authenticated Target Calendar Selector & Push Bar -->
+            <div id="gcal-sync-controls" class="hidden p-4 bg-white border border-[#1F3FD0]/25 rounded-xl space-y-3">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] font-bold text-neutral-700 uppercase tracking-wider mb-1">Target Google Calendar</label>
+                  <select id="gcal-target-select" onchange="toggleNewCalInput(this.value)" class="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-[#1F3FD0]">
+                    <option value="primary">Primary Calendar</option>
+                    <option value="__NEW__">+ Create a Brand New Calendar...</option>
+                  </select>
+                </div>
+                <div id="gcal-new-cal-wrap" class="hidden">
+                  <label class="block text-[11px] font-bold text-neutral-700 uppercase tracking-wider mb-1">New Calendar Name</label>
+                  <input type="text" id="gcal-new-cal-name" class="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs" placeholder="e.g. Fall Semester 2026" />
+                </div>
+              </div>
+              <div class="flex items-center justify-between pt-1">
+                <p id="gcal-push-progress" class="text-xs text-neutral-500">Ready to insert events with per-category colors.</p>
+                <button id="gcal-push-btn" onclick="pushEventsToGoogleCalendar()" class="px-5 py-2.5 bg-[#25891C] hover:bg-[#1E7016] text-white text-xs font-bold rounded-xl shadow-sm transition-all">
+                  🚀 Push Events Now
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -310,10 +408,10 @@
               <tr>
                 <th class="py-3 px-3">Date</th>
                 <th class="py-3 px-3">Time</th>
-                <th class="py-3 px-3">Category</th>
+                <th class="py-3 px-3">Category &amp; Color</th>
                 <th class="py-3 px-3">Event Title</th>
-                <th class="py-3 px-3">Location & Details</th>
-                <th class="py-3 px-2 text-center">Action</th>
+                <th class="py-3 px-3">Location &amp; Details</th>
+                <th class="py-3 px-2 text-center">Actions</th>
               </tr>
             </thead>
             <tbody id="events-tbody" class="divide-y divide-neutral-100">
@@ -323,7 +421,7 @@
         </div>
 
         <div class="flex justify-between items-center text-xs text-neutral-400 pt-2">
-          <span>Click any field to edit directly before downloading.</span>
+          <span>Click any field to edit directly before downloading or syncing.</span>
           <button onclick="downloadICS()" class="text-[#25891C] font-bold hover:underline">Download Calendar (.ics) &rarr;</button>
         </div>
       </section>
@@ -333,10 +431,10 @@
     <!-- Footer matching Zyfn branding -->
     <footer class="mt-16 text-center text-xs text-neutral-400 pb-8 border-t border-neutral-100 pt-8 space-y-1">
       <p class="font-heading font-bold text-neutral-700 tracking-wider">ZYFN KOTHAVALA<span class="text-[#1F3FD0]">.</span></p>
-      <p>Universal Calendar Generator • Compatible with Google Calendar, Apple Calendar, Outlook, iOS & Android</p>
+      <p>Universal Calendar Generator • Compatible with Google Calendar, Apple Calendar, Outlook, iOS &amp; Android</p>
       <p class="pt-1">
-        <a href="https://www.zyfn.com" class="text-neutral-600 font-semibold hover:underline">zyfn.com</a> • 
-        <a href="https://github.com/KidOBricks/doc-to-calendar" target="_blank" class="text-[#1F3FD0] hover:underline">GitHub</a> • 
+        <a href="https://www.zyfn.com" class="text-neutral-600 font-semibold hover:underline">zyfn.com</a> •
+        <a href="https://github.com/KidOBricks/doc-to-calendar" target="_blank" class="text-[#1F3FD0] hover:underline">GitHub</a> •
         <a href="mailto:sayhi@zyfn.com" class="text-neutral-500 hover:underline">sayhi@zyfn.com</a>
       </p>
     </footer>
@@ -345,18 +443,43 @@
 
   <!-- Application Logic -->
   <script>
-    // Initialize standard PDF.js worker
     if (window.pdfjsLib) {
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
 
+    // Official Google Calendar Event Colors (1-11)
+    const GCAL_COLORS = [
+      { id: '11', name: 'Tomato', hex: '#dc2127' },
+      { id: '4', name: 'Flamingo', hex: '#ff887c' },
+      { id: '6', name: 'Tangerine', hex: '#ffb878' },
+      { id: '5', name: 'Banana', hex: '#fbd75b' },
+      { id: '2', name: 'Sage', hex: '#7ae7bf' },
+      { id: '10', name: 'Basil', hex: '#51b749' },
+      { id: '7', name: 'Peacock', hex: '#46d6db' },
+      { id: '9', name: 'Blueberry', hex: '#5484ed' },
+      { id: '1', name: 'Lavender', hex: '#a4bdfc' },
+      { id: '3', name: 'Grape', hex: '#dbadff' },
+      { id: '8', name: 'Graphite', hex: '#e1e1e1' }
+    ];
+
+    let categoryColorMap = {
+      DDL: '11',
+      MEET: '9',
+      EVT: '10',
+      FLIGHT: '3',
+      HOL: '2',
+      MILE: '5'
+    };
+
     // State variables
+    let activeTab = 'upload';
     let currentFileContent = "";
     let currentFileBase64 = null;
     let currentFileType = "";
     let currentFileName = "";
     let extractedEvents = [];
     let isFileProcessing = false;
+    let gcalAccessToken = null;
     let configuredAlarms = [
       { id: 'al_1', trigger: '-P1D', category: 'ALL' },
       { id: 'al_2', trigger: '-PT2H', category: 'DDL' }
@@ -365,9 +488,37 @@
     window.addEventListener('DOMContentLoaded', () => {
       detectTimezone();
       renderAlarms();
+      renderCategoryColorPickers();
+      const savedClientId = localStorage.getItem('zyfn_gcal_client_id');
+      if (savedClientId) {
+        document.getElementById('gcal-client-id').value = savedClientId;
+      }
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('quick') === '1' || params.get('quick') === 'true' || window.location.hash === '#quick') {
+        applyQuickDefaults();
+        showAlert("⚡ Quick Mode pre-selected with optimal defaults! Upload a file/image or paste text, then click Quick Extract.", "info");
+      }
     });
 
-    // Detect browser timezone
+    // Global Clipboard Paste Support (Screenshots / Images / Pasted Text)
+    window.addEventListener('paste', (e) => {
+      const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          e.preventDefault();
+          const blob = item.getAsFile();
+          if (blob) {
+            const ext = item.type.split('/')[1] || 'png';
+            const pastedFile = new File([blob], `pasted_screenshot_${Date.now()}.${ext}`, { type: item.type });
+            switchTab('upload');
+            handleFile(pastedFile);
+          }
+          return;
+        }
+      }
+    });
+
     function detectTimezone() {
       try {
         const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -387,13 +538,11 @@
       } catch (e) {}
     }
 
-    // Filename live preview
     document.getElementById('calendar-name-input').addEventListener('input', (e) => {
       const val = e.target.value.trim() || "My_Schedule";
       document.getElementById('filename-preview').textContent = `${val.replace(/\s+/g, '_')}.ics`;
     });
 
-    // Toggle All-Day checkbox
     function toggleAllDay(checked) {
       const timeInput = document.getElementById('default-time');
       if (checked) {
@@ -402,6 +551,42 @@
       } else {
         timeInput.disabled = false;
         timeInput.classList.remove('bg-neutral-100', 'text-neutral-400');
+      }
+    }
+
+    // Apply Opinionated Quick Mode Settings
+    function applyQuickDefaults() {
+      detectTimezone();
+      document.getElementById('cat-style').value = 'short';
+      document.getElementById('scope-select').value = 'all';
+      document.getElementById('all-day-checkbox').checked = false;
+      toggleAllDay(false);
+      document.getElementById('default-time').value = '23:59';
+
+      if (currentFileName && document.getElementById('calendar-name-input').value === 'My_Schedule') {
+        const cleanBase = currentFileName.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+        if (cleanBase) {
+          document.getElementById('calendar-name-input').value = cleanBase;
+          document.getElementById('filename-preview').textContent = `${cleanBase}.ics`;
+        }
+      }
+
+      configuredAlarms = [
+        { id: 'al_q1', trigger: '-P1D', category: 'DDL' },
+        { id: 'al_q2', trigger: '-PT2H', category: 'DDL' },
+        { id: 'al_q3', trigger: '-PT30M', category: 'MEET' },
+        { id: 'al_q4', trigger: '-PT30M', category: 'EVT' },
+        { id: 'al_q5', trigger: '-PT2H', category: 'FLIGHT' }
+      ];
+      renderAlarms();
+    }
+
+    async function quickExtract() {
+      applyQuickDefaults();
+      const ok = await startExtraction(true);
+      if (ok && extractedEvents.length > 0) {
+        downloadICS();
+        showAlert(`⚡ Quick Extract complete! Auto-downloaded ${document.getElementById('filename-preview').textContent} with ${extractedEvents.length} events.`, "success");
       }
     }
 
@@ -416,7 +601,7 @@
 
       configuredAlarms.forEach((alarm, idx) => {
         const div = document.createElement('div');
-        div.className = "flex items-center space-x-2 bg-neutral-50 p-2.5 rounded-xl border border-neutral-200 text-xs";
+        div.className = "flex flex-wrap items-center gap-2 bg-neutral-50 p-2.5 rounded-xl border border-neutral-200 text-xs";
         div.innerHTML = `
           <span class="text-neutral-400">⏰</span>
           <select onchange="updateAlarm(${idx}, 'trigger', this.value)" class="px-2.5 py-1 border border-neutral-300 rounded-lg bg-white text-xs">
@@ -432,10 +617,10 @@
           <span class="text-neutral-500 font-medium">for</span>
           <select onchange="updateAlarm(${idx}, 'category', this.value)" class="px-2.5 py-1 border border-neutral-300 rounded-lg bg-white text-xs">
             <option value="ALL" ${alarm.category === 'ALL' ? 'selected' : ''}>All Categories</option>
-            <option value="DDL" ${alarm.category === 'DDL' ? 'selected' : ''}>Deadlines & Milestones only</option>
-            <option value="MEET" ${alarm.category === 'MEET' ? 'selected' : ''}>Meetings & Calls only</option>
-            <option value="EVT" ${alarm.category === 'EVT' ? 'selected' : ''}>Events & Sessions only</option>
-            <option value="FLIGHT" ${alarm.category === 'FLIGHT' ? 'selected' : ''}>Flights & Travel only</option>
+            <option value="DDL" ${alarm.category === 'DDL' ? 'selected' : ''}>Deadlines &amp; Milestones only</option>
+            <option value="MEET" ${alarm.category === 'MEET' ? 'selected' : ''}>Meetings &amp; Calls only</option>
+            <option value="EVT" ${alarm.category === 'EVT' ? 'selected' : ''}>Events &amp; Sessions only</option>
+            <option value="FLIGHT" ${alarm.category === 'FLIGHT' ? 'selected' : ''}>Flights &amp; Travel only</option>
           </select>
           <button type="button" onclick="removeAlarm(${idx})" class="ml-auto text-rose-500 hover:text-rose-700 font-bold px-1.5" title="Remove alarm">✕</button>
         `;
@@ -444,25 +629,52 @@
     }
 
     function addAlarmRow() {
-      configuredAlarms.push({
-        id: 'al_' + Date.now(),
-        trigger: '-PT1H',
-        category: 'ALL'
+      configuredAlarms.push({ id: 'al_' + Date.now(), trigger: '-PT1H', category: 'ALL' });
+      renderAlarms();
+    }
+    function updateAlarm(idx, field, val) { if (configuredAlarms[idx]) configuredAlarms[idx][field] = val; }
+    function removeAlarm(idx) { configuredAlarms.splice(idx, 1); renderAlarms(); }
+
+    // Per-Category Google Calendar Colors UI
+    function renderCategoryColorPickers() {
+      const grid = document.getElementById('category-colors-grid');
+      if (!grid) return;
+      grid.innerHTML = "";
+      const cats = [
+        { code: 'DDL', label: 'Deadlines' },
+        { code: 'MEET', label: 'Meetings' },
+        { code: 'EVT', label: 'Events' },
+        { code: 'FLIGHT', label: 'Flights' },
+        { code: 'HOL', label: 'Holidays' },
+        { code: 'MILE', label: 'Milestones' }
+      ];
+
+      cats.forEach(c => {
+        const selectedColor = GCAL_COLORS.find(col => col.id === categoryColorMap[c.code]) || GCAL_COLORS[0];
+        const card = document.createElement('div');
+        card.className = "bg-white border border-neutral-200 rounded-xl p-2.5 flex flex-col gap-1.5";
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-neutral-800">${c.code}</span>
+            <span class="w-3 h-3 rounded-full border border-black/10" style="background-color: ${selectedColor.hex}"></span>
+          </div>
+          <select onchange="updateCategoryColor('${c.code}', this.value)" class="w-full text-[11px] border border-neutral-200 rounded-lg px-1.5 py-1 bg-neutral-50 focus:outline-none focus:ring-1 focus:ring-[#1F3FD0]">
+            ${GCAL_COLORS.map(col => `<option value="${col.id}" ${col.id === categoryColorMap[c.code] ? 'selected' : ''}>${col.name}</option>`).join('')}
+          </select>
+        `;
+        grid.appendChild(card);
       });
-      renderAlarms();
     }
 
-    function updateAlarm(idx, field, val) {
-      if (configuredAlarms[idx]) configuredAlarms[idx][field] = val;
-    }
-
-    function removeAlarm(idx) {
-      configuredAlarms.splice(idx, 1);
-      renderAlarms();
+    function updateCategoryColor(catCode, colorId) {
+      categoryColorMap[catCode] = colorId;
+      renderCategoryColorPickers();
+      if (extractedEvents.length > 0) renderTable();
     }
 
     // Tabs switching
     function switchTab(tab) {
+      activeTab = tab;
       if (tab === 'upload') {
         document.getElementById('pane-upload').classList.remove('hidden');
         document.getElementById('pane-paste').classList.add('hidden');
@@ -476,7 +688,7 @@
       }
     }
 
-    // Drag and Drop & File Upload
+    // Drag & Drop & File Upload
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('file-input');
 
@@ -492,7 +704,6 @@
       if (e.target.files.length) handleFile(e.target.files[0]);
     });
 
-    // Convert ArrayBuffer to Base64 in safe chunks
     function arrayBufferToBase64(buffer) {
       let binary = '';
       const bytes = new Uint8Array(buffer);
@@ -508,14 +719,16 @@
       currentFileType = file.type || "application/octet-stream";
       document.getElementById('file-name').textContent = file.name;
       document.getElementById('file-size').textContent = `(${(file.size / 1024).toFixed(1)} KB)`;
-      
-      const ext = file.name.split('.').pop().toLowerCase();
-      document.getElementById('file-type-badge').textContent = ext.toUpperCase();
-      
+
+      const ext = (file.name.split('.').pop() || '').toLowerCase();
+      document.getElementById('file-type-badge').textContent = ext.toUpperCase() || 'FILE';
+
       const statusBadge = document.getElementById('file-status-badge');
       statusBadge.textContent = "Processing...";
       statusBadge.className = "px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-semibold text-[10px] animate-pulse";
-      
+
+      const imgPreview = document.getElementById('image-preview');
+      imgPreview.classList.add('hidden');
       document.getElementById('file-info').classList.remove('hidden');
       dropzone.classList.add('hidden');
 
@@ -523,14 +736,21 @@
       extractBtn.disabled = true;
       extractBtn.innerHTML = `<span>⏳ Processing ${ext.toUpperCase()}...</span>`;
       isFileProcessing = true;
+      currentFileBase64 = null;
+      currentFileContent = "";
 
       try {
         const arrayBuffer = await file.arrayBuffer();
-        // Convert to base64 immediately for direct Gemini AI multimodal transmission
-        currentFileBase64 = arrayBufferToBase64(arrayBuffer);
 
-        if (['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext)) {
-          currentFileType = file.type || 'image/png';
+        if (['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'].includes(ext) || file.type.startsWith('image/')) {
+          currentFileType = file.type || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+          currentFileBase64 = arrayBufferToBase64(arrayBuffer);
+
+          // Show image thumbnail
+          const objUrl = URL.createObjectURL(file);
+          imgPreview.src = objUrl;
+          imgPreview.classList.remove('hidden');
+
           const ocrProgress = document.getElementById('ocr-progress');
           const ocrStatus = document.getElementById('ocr-status');
           const ocrBar = document.getElementById('ocr-bar');
@@ -538,43 +758,35 @@
           ocrProgress.classList.remove('hidden');
 
           try {
-            const result = await Tesseract.recognize(
-              file,
-              'eng',
-              {
-                logger: m => {
-                  if (m.status === 'recognizing text') {
-                    const pct = Math.round(m.progress * 100);
-                    ocrStatus.textContent = `Scanning image OCR... (${pct}%)`;
-                    ocrPct.textContent = `${pct}%`;
-                    ocrBar.style.width = `${pct}%`;
-                  }
+            const result = await Tesseract.recognize(file, 'eng', {
+              logger: m => {
+                if (m.status === 'recognizing text') {
+                  const pct = Math.round(m.progress * 100);
+                  ocrStatus.textContent = `Scanning image OCR... (${pct}%)`;
+                  ocrPct.textContent = `${pct}%`;
+                  ocrBar.style.width = `${pct}%`;
                 }
               }
-            );
+            });
             currentFileContent = result.data.text || "";
-            ocrStatus.textContent = "Image ready!";
-            setTimeout(() => ocrProgress.classList.add('hidden'), 1500);
+            ocrStatus.textContent = "Image OCR complete!";
+            setTimeout(() => ocrProgress.classList.add('hidden'), 1200);
           } catch (err) {
-            console.warn("Tesseract client OCR deferred to Gemini Multimodal:", err);
+            console.warn("Tesseract client OCR deferred to Gemini Vision:", err);
             ocrProgress.classList.add('hidden');
           }
         } else if (ext === 'pdf') {
           currentFileType = 'application/pdf';
+          currentFileBase64 = arrayBufferToBase64(arrayBuffer);
           try {
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             let text = "";
-            
             for (let i = 1; i <= pdf.numPages; i++) {
               const page = await pdf.getPage(i);
               const content = await page.getTextContent();
-              
-              // Reconstruct proper lines based on vertical Y position
               let lastY = null;
               for (const item of content.items) {
-                if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) {
-                  text += "\n";
-                }
+                if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) text += "\n";
                 text += item.str + " ";
                 lastY = item.transform[5];
               }
@@ -582,13 +794,51 @@
             }
             currentFileContent = text;
           } catch (pdfErr) {
-            console.warn("PDF.js worker issue, attempting direct text decode:", pdfErr);
+            console.warn("PDF.js error, attempting direct text decode:", pdfErr);
             currentFileContent = await file.text();
           }
         } else if (ext === 'docx') {
-          currentFileType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-          const res = await mammoth.extractRawText({ arrayBuffer });
-          currentFileContent = res.value;
+          currentFileType = 'text/plain';
+          try {
+            // Preserve Word table rows & headings cleanly via HTML conversion without duplicating table cells
+            const htmlRes = await mammoth.convertToHtml({ arrayBuffer });
+            const doc = new DOMParser().parseFromString(htmlRes.value, 'text/html');
+            const outLines = [];
+            doc.querySelectorAll('tr, h1, h2, h3, h4, li, body > p').forEach(el => {
+              if (el.tagName === 'TR') {
+                const cells = Array.from(el.querySelectorAll('th,td')).map(td => td.textContent.replace(/\s+/g, ' ').trim());
+                if (cells.some(Boolean)) outLines.push(cells.join(' | '));
+              } else {
+                const txt = el.textContent.replace(/\s+/g, ' ').trim();
+                if (txt) outLines.push(txt);
+              }
+            });
+            if (outLines.length > 0) {
+              currentFileContent = outLines.join('\n');
+            } else {
+              const rawRes = await mammoth.extractRawText({ arrayBuffer });
+              currentFileContent = rawRes.value || '';
+            }
+          } catch (docxErr) {
+            const rawRes = await mammoth.extractRawText({ arrayBuffer });
+            currentFileContent = rawRes.value || '';
+          }
+        } else if (ext === 'html' || ext === 'htm') {
+          currentFileType = 'text/plain';
+          const rawHtml = await file.text();
+          const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
+          const rows = [];
+          doc.querySelectorAll('tr, li, p, h1, h2, h3, h4').forEach(el => {
+            if (el.tagName !== 'TR' && el.closest('tr')) return;
+            if (el.tagName === 'TR') {
+              const cells = Array.from(el.querySelectorAll('th,td')).map(td => td.textContent.replace(/\s+/g, ' ').trim());
+              if (cells.some(Boolean)) rows.push(cells.join(' | '));
+            } else {
+              const txt = el.textContent.replace(/\s+/g, ' ').trim();
+              if (txt) rows.push(txt);
+            }
+          });
+          currentFileContent = rows.length > 0 ? rows.join('\n') : (doc.body?.innerText || rawHtml);
         } else {
           currentFileType = 'text/plain';
           currentFileContent = await file.text();
@@ -603,7 +853,7 @@
       } finally {
         isFileProcessing = false;
         extractBtn.disabled = false;
-        extractBtn.innerHTML = `<span>✨ Extract & Build Calendar</span>`;
+        extractBtn.innerHTML = `<span>✨ Extract &amp; Review</span>`;
       }
     }
 
@@ -613,29 +863,44 @@
       currentFileBase64 = null;
       currentFileType = "";
       currentFileName = "";
+      document.getElementById('image-preview').classList.add('hidden');
+      document.getElementById('image-preview').src = "";
       document.getElementById('file-info').classList.add('hidden');
       document.getElementById('ocr-progress').classList.add('hidden');
       dropzone.classList.remove('hidden');
     }
 
     // Main Extraction Dispatcher
-    async function startExtraction() {
+    async function startExtraction(isQuick = false) {
       if (isFileProcessing) {
         showAlert("Document is still being loaded. Please wait a moment...", "warning");
-        return;
+        return false;
       }
 
-      const text = (currentFileContent || document.getElementById('text-input').value || "").trim();
-      
-      if (!text && !currentFileBase64) {
-        showAlert("Please upload a document, schedule flyer, or paste text first!", "warning");
-        return;
+      const pastedText = (document.getElementById('text-input').value || "").trim();
+      let text = "";
+      let fileB64ToUse = null;
+      let fileMimeToUse = null;
+
+      if (activeTab === 'paste' && pastedText) {
+        text = pastedText;
+      } else if (currentFileContent || currentFileBase64) {
+        text = currentFileContent.trim();
+        fileB64ToUse = currentFileBase64;
+        fileMimeToUse = currentFileType;
+      } else if (pastedText) {
+        text = pastedText;
+      }
+
+      if (!text && !fileB64ToUse) {
+        showAlert("Please upload a file/image, paste a screenshot (Ctrl+V), or paste text first!", "warning");
+        return false;
       }
 
       const shortCode = document.getElementById('short-code').value.trim();
       const catStyle = document.getElementById('cat-style').value;
       const isAllDayDefault = document.getElementById('all-day-checkbox').checked;
-      const defaultTime = isAllDayDefault ? null : (document.getElementById('default-time').value || "18:00");
+      const defaultTime = isAllDayDefault ? null : (document.getElementById('default-time').value || "23:59");
       const scope = document.getElementById('scope-select').value;
 
       const extractBtn = document.getElementById('extract-btn');
@@ -643,44 +908,43 @@
       extractBtn.disabled = true;
 
       try {
-        // Try calling the Wix backend endpoint (zyfn.com) which connects to Gemini 3.8 Flash High
-        extractedEvents = await callWixBackendExtraction(text, currentFileBase64, currentFileType, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
-        showAlert(`Successfully extracted ${extractedEvents.length} events using Gemini 3.8 Flash High!`, "success");
+        extractedEvents = await callWixBackendExtraction(text, fileB64ToUse, fileMimeToUse, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
+        if (!isQuick) showAlert(`Successfully extracted ${extractedEvents.length} events using Gemini 3.8 Flash High!`, "success");
       } catch (backendErr) {
-        console.warn("Backend API issue or timeout, using enhanced multi-line parser:", backendErr);
-        // Fallback to high-accuracy multi-line client-side parser
+        console.warn("Backend API unavailable/timeout, using multi-format client parser:", backendErr);
         extractedEvents = parseDocumentEvents(text, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
-        showAlert(`Extracted ${extractedEvents.length} events from document!`, "success");
+        if (extractedEvents.length === 0) {
+          showAlert("Could not detect clear dates/events in this input. Check formatting or add rows manually below.", "warning");
+        } else if (!isQuick) {
+          showAlert(`Extracted ${extractedEvents.length} events from your input!`, "success");
+        }
       } finally {
-        extractBtn.innerHTML = `<span>✨ Extract & Build Calendar</span>`;
+        extractBtn.innerHTML = `<span>✨ Extract &amp; Review</span>`;
         extractBtn.disabled = false;
       }
 
       renderTable();
       document.getElementById('results-section').classList.remove('hidden');
       document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+      return true;
     }
 
-    // Call Wix Backend HTTP function (Gemini 3.8 Flash High)
     async function callWixBackendExtraction(text, fileBase64, mimeType, code, catStyle, defaultTime, isAllDay, scope) {
       const prompt = `You are an expert calendar extraction AI using Gemini 3.8 Flash with High thinking effort.
-Extract all calendar events, deadlines, meetings, lectures, travel flights, holidays, and milestones from this document into a valid JSON array of objects.
+Extract all calendar events, deadlines, meetings, lectures, travel flights, holidays, and milestones from this document, image, or pasted note into a valid JSON array of objects.
 
 Rules:
 - title: string (format as: ${code ? code + ' - ' : ''}[CATEGORY] - Event Title)
 - date: string YYYY-MM-DD
 - startTime: HH:MM in 24h or null if all-day
 - endTime: HH:MM in 24h or null
-- isAllDay: boolean
+- isAllDay: boolean (true for holidays/date-only events unless it's a deadline without hour -> defaultTime ${defaultTime || '23:59'})
 - category: one of [DDL, MEET, EVT, FLIGHT, HOL, MILE]
 - location: string
 - description: string
 
-Category style preference: ${catStyle} (short: DDL/MEET/EVT; full: DEADLINE/MEETING/EVENT; none: omit tag)
+Category style preference: ${catStyle} (short: DDL/MEET/EVT/FLIGHT/HOL/MILE; full: DEADLINE/MEETING/EVENT/FLIGHT/HOLIDAY/MILESTONE; none: omit category tag)
 Extraction scope filter: ${scope}
-
-Document content:
-${text.substring(0, 40000)}
 
 Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
 
@@ -688,20 +952,21 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
       let res = null;
       let lastErr = null;
 
+      // Only send binary inlineData for PDF & images
+      const canInline = fileBase64 && mimeType && (mimeType === 'application/pdf' || mimeType.startsWith('image/'));
+
       for (const ep of endpoints) {
         try {
-          // Generous 20-second timeout for Gemini 3.8 Flash High reasoning
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 20000);
-
+          const timeoutId = setTimeout(() => controller.abort(), 13000);
           res = await fetch(ep, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              prompt: prompt, 
-              text: text.substring(0, 40000),
-              fileBase64: fileBase64 || null,
-              mimeType: mimeType || null,
+            body: JSON.stringify({
+              prompt: prompt,
+              text: text.substring(0, 60000),
+              fileBase64: canInline ? fileBase64 : null,
+              mimeType: canInline ? mimeType : null,
               model: 'gemini-3.8-flash',
               thinkingLevel: 'HIGH'
             }),
@@ -718,7 +983,7 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
 
       const data = await res.json();
       if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-      
+
       let rawText = "";
       if (data.candidates && data.candidates[0] && data.candidates[0].content) {
         rawText = data.candidates[0].content.parts[0].text;
@@ -730,7 +995,6 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
       }
 
       if (!rawText) throw new Error("No response candidates from Gemini API");
-
       const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleanJson);
       const items = Array.isArray(parsed) ? parsed : (parsed.events || [parsed]);
@@ -742,8 +1006,8 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
         id: 'ev_' + Math.random().toString(36).substr(2, 9),
         title: item.title || "Scheduled Event",
         date: item.date || new Date().toISOString().split('T')[0],
-        startTime: item.startTime || (isAllDay ? "" : (defaultTime || "18:00")),
-        endTime: item.endTime || item.startTime || (isAllDay ? "" : (defaultTime || "18:00")),
+        startTime: item.startTime || (isAllDay ? "" : (defaultTime || "23:59")),
+        endTime: item.endTime || item.startTime || (isAllDay ? "" : (defaultTime || "23:59")),
         isAllDay: item.isAllDay !== undefined ? item.isAllDay : isAllDay,
         category: item.category || 'EVT',
         location: item.location || '',
@@ -751,136 +1015,245 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
       }));
     }
 
-    // High-Accuracy Month-Anchored Multi-Line Parser (100% Reliable Fallback)
+    // Helper: Convert 12h time with am/pm to 24h HH:MM
+    function normalizeTime(timeStr, ampm) {
+      if (!timeStr) return "";
+      const parts = timeStr.replace('.', ':').split(':');
+      let h = parseInt(parts[0], 10);
+      const m = parts[1] ? parts[1].padStart(2, '0') : '00';
+      if (ampm) {
+        const ap = ampm.toLowerCase();
+        if (ap === 'pm' && h < 12) h += 12;
+        if (ap === 'am' && h === 12) h = 0;
+      }
+      return `${String(h).padStart(2, '0')}:${m}`;
+    }
+
+    // Multi-Format Client-Side Fallback Parser (ICS, CSV, ISO, Slash/Dot dates, Month Names)
     function parseDocumentEvents(text, code, catStyle, defaultTime, isAllDay, scope) {
+      if (!text) return [];
       const events = [];
-      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
       function formatCategoryTag(cat) {
         if (catStyle === 'none') return '';
         if (catStyle === 'full') {
-          return cat === 'DDL' ? 'DEADLINE' : cat === 'MEET' ? 'MEETING' : cat === 'EVT' ? 'EVENT' : cat === 'FLIGHT' ? 'FLIGHT' : cat === 'HOL' ? 'HOLIDAY' : cat;
+          const map = { DDL: 'DEADLINE', MEET: 'MEETING', EVT: 'EVENT', FLIGHT: 'FLIGHT', HOL: 'HOLIDAY', MILE: 'MILESTONE' };
+          return map[cat] || cat;
         }
         return cat;
       }
 
-      const monthsDict = {
-        jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12,
-        january:1, february:2, march:3, april:4, may:5, june:6, july:7, august:8, september:9, october:10, november:11, december:12
-      };
+      function classifyCategory(titleStr) {
+        const tLower = titleStr.toLowerCase();
+        if (/\b(holiday|break|vacation|closed|closure|off)\b/.test(tLower)) return 'HOL';
+        if (/\b(flight|depart|arrive|terminal|boarding|train|hotel|check-in|check-out)\b/.test(tLower)) return 'FLIGHT';
+        if (/\b(meeting|lecture|session|review lecture|sync|mentor|coach|q&a|call|1:1|standup|appointment)\b/.test(tLower)) return 'MEET';
+        if (/\b(deadline|due|submit|submission|retake|exam|quiz|midterm|final|assignment)\b/.test(tLower)) return 'DDL';
+        if (/\b(milestone|launch|release|checkpoint|kickoff)\b/.test(tLower)) return 'MILE';
+        return 'EVT';
+      }
 
+      function buildTitle(cat, rawTitle) {
+        const prefix = code ? `${code} - ` : '';
+        const tag = formatCategoryTag(cat);
+        return tag ? `${prefix}${tag} - ${rawTitle}` : `${prefix}${rawTitle}`;
+      }
+
+      // 1. Direct ICS VEVENT parsing
+      if (text.includes('BEGIN:VEVENT')) {
+        const unfolded = text.replace(/\r?\n[ \t]/g, '');
+        const blocks = unfolded.split('BEGIN:VEVENT').slice(1);
+        for (const blk of blocks) {
+          const getField = (name) => {
+            const m = blk.match(new RegExp(`^${name}(?:;[^:]*)?:(.*)$`, 'mi'));
+            return m ? m[1].trim() : '';
+          };
+          const rawSummary = getField('SUMMARY').replace(/\\n/g, ' ').replace(/\\([,;\\])/g, '$1') || 'Calendar Event';
+          const dtStart = getField('DTSTART');
+          const dtEnd = getField('DTEND');
+          if (!dtStart) continue;
+
+          const dm = dtStart.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?/);
+          if (!dm) continue;
+          const dateStr = `${dm[1]}-${dm[2]}-${dm[3]}`;
+          const startTime = dm[4] ? `${dm[4]}:${dm[5]}` : "";
+          let endTime = startTime;
+          if (dtEnd) {
+            const em = dtEnd.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?/);
+            if (em && em[4]) endTime = `${em[4]}:${em[5]}`;
+          }
+          const cat = classifyCategory(rawSummary);
+          events.push({
+            id: 'ev_' + Math.random().toString(36).substr(2, 9),
+            title: buildTitle(cat, rawSummary),
+            date: dateStr,
+            startTime: startTime || (isAllDay ? "" : (defaultTime || "23:59")),
+            endTime: endTime || startTime || (isAllDay ? "" : (defaultTime || "23:59")),
+            isAllDay: !startTime,
+            category: cat,
+            location: getField('LOCATION').replace(/\\([,;\\])/g, '$1'),
+            description: getField('DESCRIPTION').replace(/\\n/g, '\n').replace(/\\([,;\\])/g, '$1')
+          });
+        }
+        if (events.length > 0) return events;
+      }
+
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const monthsDict = {
+        jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, sept:9, oct:10, nov:11, dec:12,
+        january:1, february:2, march:3, april:4, june:6, july:7, august:8, september:9, october:10, november:11, december:12
+      };
       const monthNames = Object.keys(monthsDict).join('|');
 
-      const dateRegex = new RegExp(
+      // Matches Month DD [YYYY], DD Month [YYYY], YYYY-MM-DD, DD/MM/YYYY or MM/DD/YYYY, DD.MM.YYYY + optional times w/ am/pm
+      const monthRegex = new RegExp(
         `(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*[\\s,]*)?` +
         `(?:(${monthNames})\\s+(\\d{1,2})(?:st|nd|rd|th)?|(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?(${monthNames}))` +
         `(?:,?\\s+(\\d{4}))?` +
-        `(?:[^\\d\\n\\r]*(\\d{1,2}[:.]\\d{2})\\s*(?:am|pm|h)?(?:\\s*[-–]\\s*(\\d{1,2}[:.]\\d{2})\\s*(?:am|pm|h)?)?)?`,
+        `(?:[^\\d\\n\\r]{0,20}(\\d{1,2}[:.]\\d{2})\\s*(am|pm)?(?:\\s*[-–to]+\\s*(\\d{1,2}[:.]\\d{2})\\s*(am|pm)?)?)?`,
         'gi'
       );
 
-      const timeRegex = /^(\d{1,2}[:.]\d{2})(?:\s*[-–]\s*(\d{1,2}[:.]\d{2}))?/i;
+      const numericRegex = new RegExp(
+        `(?:(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})|(\\d{1,2})[./-](\\d{1,2})[./-](\\d{2,4}))` +
+        `(?:[^\\d\\n\\r]{0,15}(\\d{1,2}[:.]\\d{2})\\s*(am|pm)?(?:\\s*[-–to]+\\s*(\\d{1,2}[:.]\\d{2})\\s*(am|pm)?)?)?`,
+        'gi'
+      );
+
+      const monthTestRegex = new RegExp(monthRegex.source, 'i');
+      const numericTestRegex = new RegExp(numericRegex.source, 'i');
+
+      const timeOnlyRegex = /^(\d{1,2}[:.]\d{2})\s*(am|pm)?(?:\s*[-–to]+\s*(\d{1,2}[:.]\d{2})\s*(am|pm)?)?/i;
+
+      const pushCandidate = (year, month, day, startTime, endTime, rawTitle, lineIdx, line) => {
+        if (month < 1 || month > 12 || day < 1 || day > 31) return;
+
+        if (!startTime && lineIdx + 1 < lines.length) {
+          const tm = lines[lineIdx + 1].match(timeOnlyRegex);
+          if (tm) {
+            startTime = normalizeTime(tm[1], tm[2]);
+            endTime = tm[3] ? normalizeTime(tm[3], tm[4] || tm[2]) : startTime;
+          }
+        }
+
+        let title = rawTitle.replace(/^[\s:|\-,;]+|[\s:|\-,;]+$/g, '').trim();
+        if (title.length < 4 && lineIdx > 0) {
+          const prev = lines[lineIdx - 1].replace(/^[\s:|\-,;]+|[\s:|\-,;]+$/g, '').trim();
+          if (prev && !monthTestRegex.test(prev) && !numericTestRegex.test(prev)) {
+            title = title ? `${prev} - ${title}` : prev;
+          }
+        }
+        if (!title || title.length < 2) title = "Scheduled Event";
+
+        const cat = classifyCategory(title);
+        if (scope === 'deadlines' && cat !== 'DDL') return;
+        if (scope === 'meetings' && cat !== 'MEET') return;
+        if (scope === 'travel' && cat !== 'FLIGHT') return;
+
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const eventAllDay = !startTime && (isAllDay || (cat !== 'DDL' && cat !== 'MEET'));
+        const finalStart = startTime || (eventAllDay ? "" : (defaultTime || "23:59"));
+        const finalEnd = endTime || finalStart;
+
+        events.push({
+          id: 'ev_' + Math.random().toString(36).substr(2, 9),
+          title: buildTitle(cat, title),
+          date: dateStr,
+          startTime: finalStart,
+          endTime: finalEnd,
+          isAllDay: eventAllDay,
+          category: cat,
+          location: '',
+          description: line
+        });
+      };
+
+      const currentYear = new Date().getFullYear();
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        
-        let match;
-        dateRegex.lastIndex = 0;
+        let matchedOnLine = false;
 
-        while ((match = dateRegex.exec(line)) !== null) {
-          const mName = (match[1] || match[4] || '').toLowerCase();
-          if (!monthsDict[mName]) continue;
-
+        for (const m of line.matchAll(monthRegex)) {
+          const mName = (m[1] || m[4] || '').toLowerCase();
           const month = monthsDict[mName];
-          const day = parseInt(match[2] || match[3], 10);
-          const currentYear = new Date().getFullYear();
-          const year = match[5] ? parseInt(match[5], 10) : (month < 8 ? currentYear + 1 : currentYear);
+          if (!month) continue;
+          const day = parseInt(m[2] || m[3], 10);
+          const year = m[5] ? parseInt(m[5], 10) : (month < new Date().getMonth() - 1 ? currentYear + 1 : currentYear);
+          const st = normalizeTime(m[6], m[7]);
+          const et = normalizeTime(m[8], m[9] || m[7]) || st;
+          const rest = line.replace(m[0], ' ').replace(/\|/g, ' - ').trim();
+          pushCandidate(year, month, day, st, et, rest, i, line);
+          matchedOnLine = true;
+        }
 
-          let startTime = match[6] ? match[6].replace('.', ':') : "";
-          let endTime = match[7] ? match[7].replace('.', ':') : startTime;
-
-          // If no time on the date line, inspect subsequent line (e.g. table layout)
-          if (!startTime && i + 1 < lines.length) {
-            const nextLine = lines[i + 1];
-            const tm = nextLine.match(timeRegex);
-            if (tm) {
-              startTime = tm[1].replace('.', ':');
-              endTime = (tm[2] || tm[1]).replace('.', ':');
+        if (!matchedOnLine) {
+          for (const nm of line.matchAll(numericRegex)) {
+            let year, month, day;
+            if (nm[1]) {
+              year = parseInt(nm[1], 10);
+              month = parseInt(nm[2], 10);
+              day = parseInt(nm[3], 10);
+            } else {
+              const p1 = parseInt(nm[4], 10);
+              const p2 = parseInt(nm[5], 10);
+              let p3 = parseInt(nm[6], 10);
+              if (p3 < 100) p3 += 2000;
+              year = p3;
+              // Smart heuristic: if p1 > 12 it's DD/MM; if p2 > 12 it's MM/DD; default EU DD/MM if <= 12
+              if (p1 > 12) { day = p1; month = p2; }
+              else if (p2 > 12) { month = p1; day = p2; }
+              else { day = p1; month = p2; }
             }
+            const st = normalizeTime(nm[7], nm[8]);
+            const et = normalizeTime(nm[9], nm[10] || nm[8]) || st;
+            const rest = line.replace(nm[0], ' ').replace(/[|,]/g, ' ').trim();
+            pushCandidate(year, month, day, st, et, rest, i, line);
           }
-
-          let title = line.replace(match[0], '').replace(/^[:\-\s|,]+|[:\-\s|,]+$/g, '').trim();
-
-          // Check preceding lines for table title or assignment name
-          const preceding = [];
-          for (let lookback = 1; lookback <= 3; lookback++) {
-            const idx = i - lookback;
-            if (idx >= 0) {
-              const cand = lines[idx].replace(/^[:\-\s|,]+|[:\-\s|,]+$/g, '').trim();
-              if (!cand || cand.match(dateRegex) || cand.match(timeRegex)) break;
-              const candLower = cand.toLowerCase();
-              if (candLower.includes('activities exercise') || candLower.includes('table 2') || candLower.includes('deadlines for students')) break;
-              preceding.unshift(cand);
-              if (cand.length > 25) break;
-            }
-          }
-
-          if (title.length < 4) {
-            if (preceding.length > 0) title = preceding.join(" ");
-          } else if (preceding.length > 0 && title.length < 25) {
-            title = preceding.join(" ") + " - " + title;
-          }
-
-          if (!title || title.length < 3) title = "Scheduled Event";
-
-          title = title.replace(/^Assignment\s+Deadline\s+assignment\s+/i, 'Deadline Assignment ');
-
-          let cat = 'EVT';
-          const tLower = title.toLowerCase();
-          if (tLower.includes('deadline') || tLower.includes('due') || tLower.includes('submit') || tLower.includes('submission') || tLower.includes('retake') || tLower.includes('exam')) {
-            cat = 'DDL';
-          } else if (tLower.includes('meeting') || tLower.includes('lecture') || tLower.includes('session') || tLower.includes('sync') || tLower.includes('mentor') || tLower.includes('coach') || tLower.includes('q&a') || tLower.includes('prep')) {
-            cat = 'MEET';
-          } else if (tLower.includes('flight') || tLower.includes('depart') || tLower.includes('arrive') || tLower.includes('terminal')) {
-            cat = 'FLIGHT';
-          } else if (tLower.includes('holiday') || tLower.includes('break') || tLower.includes('vacation')) {
-            cat = 'HOL';
-          }
-
-          if (scope === 'deadlines' && cat !== 'DDL') continue;
-          if (scope === 'meetings' && cat !== 'MEET') continue;
-          if (scope === 'travel' && cat !== 'FLIGHT') continue;
-
-          const prefix = code ? `${code} - ` : '';
-          const tag = formatCategoryTag(cat);
-          const finalTitle = tag ? `${prefix}${tag} - ${title}` : `${prefix}${title}`;
-
-          const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-          events.push({
-            id: 'ev_' + Math.random().toString(36).substr(2, 9),
-            title: finalTitle,
-            date: dateStr,
-            startTime: startTime || (isAllDay ? "" : (defaultTime || "18:00")),
-            endTime: endTime || startTime || (isAllDay ? "" : (defaultTime || "18:00")),
-            isAllDay: isAllDay || !startTime,
-            category: cat,
-            location: '',
-            description: line
-          });
         }
       }
 
       return events;
     }
 
-    // Render Events in Staging Table
+    function nextIsoDate(dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().split('T')[0];
+    }
+
+    // Build Google Calendar Template URL for individual row
+    function buildGCalTemplateUrl(ev) {
+      const dtClean = ev.date.replace(/-/g, '');
+      let datesParam = "";
+      if (ev.isAllDay || !ev.startTime) {
+        const nextStr = nextIsoDate(ev.date).replace(/-/g, '');
+        datesParam = `${dtClean}/${nextStr}`;
+      } else {
+        const st = ev.startTime.replace(':', '') + '00';
+        const et = (ev.endTime ? ev.endTime.replace(':', '') : ev.startTime.replace(':', '')) + '00';
+        datesParam = `${dtClean}T${st}/${dtClean}T${et}`;
+      }
+      const tz = document.getElementById('timezone-select').value || "UTC";
+      const params = new URLSearchParams({
+        action: 'TEMPLATE',
+        text: ev.title,
+        dates: datesParam,
+        ctz: tz,
+        details: ev.description || '',
+        location: ev.location || ''
+      });
+      return `https://calendar.google.com/calendar/render?${params.toString()}`;
+    }
+
+    // Render Events Staging Table
     function renderTable() {
       const tbody = document.getElementById('events-tbody');
       tbody.innerHTML = "";
       document.getElementById('event-count').textContent = extractedEvents.length;
 
       extractedEvents.forEach((ev, idx) => {
+        const colId = categoryColorMap[ev.category] || '9';
+        const colObj = GCAL_COLORS.find(c => c.id === colId) || GCAL_COLORS[7];
         const tr = document.createElement('tr');
         tr.className = "hover:bg-neutral-50/80 transition-colors";
         tr.innerHTML = `
@@ -897,23 +1270,27 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
             </div>
           </td>
           <td class="py-3 px-3">
-            <select onchange="updateEvent(${idx}, 'category', this.value)" class="px-2.5 py-1.5 border border-neutral-300 rounded-lg text-xs focus:ring-1 focus:ring-[#1F3FD0] bg-white">
-              <option value="DDL" ${ev.category === 'DDL' ? 'selected' : ''}>DDL (Deadline)</option>
-              <option value="MEET" ${ev.category === 'MEET' ? 'selected' : ''}>MEET (Meeting)</option>
-              <option value="EVT" ${ev.category === 'EVT' ? 'selected' : ''}>EVT (Event)</option>
-              <option value="FLIGHT" ${ev.category === 'FLIGHT' ? 'selected' : ''}>FLIGHT (Travel)</option>
-              <option value="HOL" ${ev.category === 'HOL' ? 'selected' : ''}>HOL (Holiday)</option>
-              <option value="MILE" ${ev.category === 'MILE' ? 'selected' : ''}>MILE (Milestone)</option>
-            </select>
+            <div class="flex items-center space-x-1.5">
+              <span class="w-3 h-3 rounded-full shrink-0 border border-black/15" style="background-color:${colObj.hex}" title="Google Color: ${colObj.name}"></span>
+              <select onchange="updateEvent(${idx}, 'category', this.value); renderTable();" class="px-2 py-1.5 border border-neutral-300 rounded-lg text-xs focus:ring-1 focus:ring-[#1F3FD0] bg-white">
+                <option value="DDL" ${ev.category === 'DDL' ? 'selected' : ''}>DDL (Deadline)</option>
+                <option value="MEET" ${ev.category === 'MEET' ? 'selected' : ''}>MEET (Meeting)</option>
+                <option value="EVT" ${ev.category === 'EVT' ? 'selected' : ''}>EVT (Event)</option>
+                <option value="FLIGHT" ${ev.category === 'FLIGHT' ? 'selected' : ''}>FLIGHT (Travel)</option>
+                <option value="HOL" ${ev.category === 'HOL' ? 'selected' : ''}>HOL (Holiday)</option>
+                <option value="MILE" ${ev.category === 'MILE' ? 'selected' : ''}>MILE (Milestone)</option>
+              </select>
+            </div>
           </td>
-          <td class="py-3 px-3">
-            <input type="text" value="${escapeHtml(ev.title)}" onchange="updateEvent(${idx}, 'title', this.value)" class="w-full px-2.5 py-1.5 border border-neutral-300 rounded-lg text-xs focus:ring-1 focus:ring-[#1F3FD0] font-medium bg-white" />
+          <td class="py-3 px-3 min-w-[240px]">
+            <input type="text" value="${escapeHtml(ev.title)}" onchange="updateEvent(${idx}, 'title', this.value)" class="w-full min-w-[220px] px-2.5 py-1.5 border border-neutral-300 rounded-lg text-xs focus:ring-1 focus:ring-[#1F3FD0] font-medium bg-white" />
           </td>
-          <td class="py-3 px-3">
-            <input type="text" value="${escapeHtml(ev.location || '')}" placeholder="Location or link" onchange="updateEvent(${idx}, 'location', this.value)" class="w-full px-2.5 py-1.5 border border-neutral-300 rounded-lg text-xs focus:ring-1 focus:ring-[#1F3FD0] bg-white mb-1" />
-            <input type="text" value="${escapeHtml(ev.description || '')}" placeholder="Notes / context" onchange="updateEvent(${idx}, 'description', this.value)" class="w-full px-2.5 py-1 border border-neutral-200 text-neutral-500 rounded-md text-[11px] focus:ring-1 focus:ring-[#1F3FD0] bg-neutral-50" />
+          <td class="py-3 px-3 min-w-[210px]">
+            <input type="text" value="${escapeHtml(ev.location || '')}" placeholder="Location or link" onchange="updateEvent(${idx}, 'location', this.value)" class="w-full min-w-[190px] px-2.5 py-1.5 border border-neutral-300 rounded-lg text-xs focus:ring-1 focus:ring-[#1F3FD0] bg-white mb-1" />
+            <input type="text" value="${escapeHtml(ev.description || '')}" placeholder="Notes / context" onchange="updateEvent(${idx}, 'description', this.value)" class="w-full min-w-[190px] px-2.5 py-1 border border-neutral-200 text-neutral-500 rounded-md text-[11px] focus:ring-1 focus:ring-[#1F3FD0] bg-neutral-50" />
           </td>
-          <td class="py-3 px-2 text-center">
+          <td class="py-3 px-2 text-center whitespace-nowrap">
+            <a href="${buildGCalTemplateUrl(ev)}" target="_blank" class="inline-block text-[#1F3FD0] hover:bg-[#F4F6FF] p-1 rounded transition-colors" title="Add this event to Google Calendar">📅</a>
             <button onclick="deleteEvent(${idx})" class="text-rose-500 hover:text-rose-700 font-bold p-1 rounded hover:bg-rose-50 transition-colors" title="Delete event">🗑️</button>
           </td>
         `;
@@ -927,19 +1304,16 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
         if (isAllDay) {
           extractedEvents[idx].startTime = "";
           extractedEvents[idx].endTime = "";
+        } else {
+          extractedEvents[idx].startTime = document.getElementById('default-time').value || "18:00";
+          extractedEvents[idx].endTime = extractedEvents[idx].startTime;
         }
         renderTable();
       }
     }
 
-    function updateEvent(idx, field, val) {
-      if (extractedEvents[idx]) extractedEvents[idx][field] = val;
-    }
-
-    function deleteEvent(idx) {
-      extractedEvents.splice(idx, 1);
-      renderTable();
-    }
+    function updateEvent(idx, field, val) { if (extractedEvents[idx]) extractedEvents[idx][field] = val; }
+    function deleteEvent(idx) { extractedEvents.splice(idx, 1); renderTable(); }
 
     function addNewEventRow() {
       const isAllDay = document.getElementById('all-day-checkbox').checked;
@@ -962,6 +1336,183 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
       return (text || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
+    // Google Calendar Direct OAuth Sync
+    function toggleGcalSetup() {
+      document.getElementById('gcal-setup-box').classList.toggle('hidden');
+    }
+
+    function saveGcalClientId() {
+      const id = document.getElementById('gcal-client-id').value.trim();
+      localStorage.setItem('zyfn_gcal_client_id', id);
+      showAlert("Google OAuth Client ID saved in browser storage.", "success");
+      document.getElementById('gcal-setup-box').classList.add('hidden');
+    }
+
+    function loadGsiScript() {
+      return new Promise((resolve, reject) => {
+        if (window.google?.accounts?.oauth2) return resolve();
+        const s = document.createElement('script');
+        s.src = 'https://accounts.google.com/gsi/client';
+        s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error("Could not load Google Identity Services script."));
+        document.head.appendChild(s);
+      });
+    }
+
+    async function connectGoogleCalendar() {
+      const clientId = (document.getElementById('gcal-client-id').value || localStorage.getItem('zyfn_gcal_client_id') || '').trim();
+      if (!clientId) {
+        document.getElementById('gcal-setup-box').classList.remove('hidden');
+        showAlert("Enter your Google OAuth Client ID first, or use the 📥 Download .ics / 📅 quick-add buttons!", "warning");
+        return;
+      }
+
+      try {
+        await loadGsiScript();
+        const tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/calendar',
+          callback: async (resp) => {
+            if (resp.error) {
+              showAlert("Google Sign-In failed: " + resp.error, "error");
+              return;
+            }
+            gcalAccessToken = resp.access_token;
+            document.getElementById('gcal-auth-status').textContent = "✅ Connected to Google Calendar";
+            document.getElementById('gcal-auth-status').classList.remove('hidden');
+            document.getElementById('gcal-sync-controls').classList.remove('hidden');
+            await populateUserCalendars();
+          }
+        });
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+      } catch (err) {
+        showAlert("Google Calendar Auth error: " + err.message, "error");
+      }
+    }
+
+    async function populateUserCalendars() {
+      const select = document.getElementById('gcal-target-select');
+      select.innerHTML = `<option value="primary">Primary Calendar</option><option value="__NEW__">+ Create a Brand New Calendar...</option>`;
+      try {
+        const res = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
+          headers: { Authorization: `Bearer ${gcalAccessToken}` }
+        });
+        const data = await res.json();
+        if (data.items) {
+          select.innerHTML = '';
+          data.items.filter(c => c.accessRole === 'owner' || c.accessRole === 'writer').forEach(cal => {
+            const opt = new Option(cal.primary ? `${cal.summary} (Primary)` : cal.summary, cal.id);
+            select.add(opt);
+          });
+          select.add(new Option('+ Create a Brand New Calendar...', '__NEW__'));
+        }
+      } catch (e) {
+        console.warn("Could not list calendars:", e);
+      }
+    }
+
+    function toggleNewCalInput(val) {
+      const wrap = document.getElementById('gcal-new-cal-wrap');
+      if (val === '__NEW__') {
+        wrap.classList.remove('hidden');
+        const defaultName = document.getElementById('calendar-name-input').value.replace(/_/g, ' ').trim();
+        document.getElementById('gcal-new-cal-name').value = defaultName || "Imported Schedule";
+      } else {
+        wrap.classList.add('hidden');
+      }
+    }
+
+    function triggerToMinutes(trigger) {
+      const map = { '-PT15M': 15, '-PT30M': 30, '-PT1H': 60, '-PT2H': 120, '-PT6H': 360, '-P1D': 1440, '-P2D': 2880, '-P7D': 10080 };
+      return map[trigger] || 60;
+    }
+
+    async function pushEventsToGoogleCalendar() {
+      if (!gcalAccessToken || extractedEvents.length === 0) return;
+
+      const pushBtn = document.getElementById('gcal-push-btn');
+      const prog = document.getElementById('gcal-push-progress');
+      pushBtn.disabled = true;
+      pushBtn.textContent = "⏳ Pushing...";
+
+      const tz = document.getElementById('timezone-select').value || "UTC";
+      let targetCalId = document.getElementById('gcal-target-select').value;
+
+      try {
+        if (targetCalId === '__NEW__') {
+          const newName = document.getElementById('gcal-new-cal-name').value.trim() || "Extracted Schedule";
+          prog.textContent = `Creating calendar "${newName}"...`;
+          const calRes = await fetch('https://www.googleapis.com/calendar/v3/calendars', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${gcalAccessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ summary: newName, timeZone: tz })
+          });
+          const calData = await calRes.json();
+          if (!calRes.ok) throw new Error(calData.error?.message || "Failed to create calendar");
+          targetCalId = calData.id;
+        }
+
+        let created = 0;
+        for (let i = 0; i < extractedEvents.length; i++) {
+          const ev = extractedEvents[i];
+          prog.textContent = `Pushing ${i + 1} / ${extractedEvents.length}: ${ev.title}`;
+
+          const payload = {
+            summary: ev.title,
+            description: ev.description || '',
+            location: ev.location || '',
+            colorId: categoryColorMap[ev.category] || '9'
+          };
+
+          if (ev.isAllDay || !ev.startTime) {
+            payload.start = { date: ev.date };
+            payload.end = { date: nextIsoDate(ev.date) };
+          } else {
+            const st = ev.startTime.length === 5 ? ev.startTime + ':00' : ev.startTime;
+            const etRaw = ev.endTime || ev.startTime;
+            const et = etRaw.length === 5 ? etRaw + ':00' : etRaw;
+            payload.start = { dateTime: `${ev.date}T${st}`, timeZone: tz };
+            payload.end = { dateTime: `${ev.date}T${et}`, timeZone: tz };
+          }
+
+          const evAlarms = configuredAlarms.filter(a => a.category === 'ALL' || a.category === ev.category);
+          if (evAlarms.length > 0) {
+            payload.reminders = {
+              useDefault: false,
+              overrides: evAlarms.slice(0, 5).map(a => ({ method: 'popup', minutes: triggerToMinutes(a.trigger) }))
+            };
+          }
+
+          const evRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalId)}/events`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${gcalAccessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+          if (!evRes.ok) {
+            const errJson = await evRes.json();
+            throw new Error(errJson.error?.message || `Failed on "${ev.title}"`);
+          }
+          created++;
+        }
+
+        prog.textContent = `✅ Added ${created} events with category colors!`;
+        showAlert(`Successfully pushed ${created} events to Google Calendar!`, "success");
+      } catch (err) {
+        prog.textContent = "❌ Error: " + err.message;
+        showAlert("Google Calendar sync error: " + err.message, "error");
+      } finally {
+        pushBtn.disabled = false;
+        pushBtn.textContent = "🚀 Push Events Now";
+      }
+    }
+
     function showAlert(msg, type = "info") {
       const banner = document.getElementById('alert-banner');
       const text = document.getElementById('alert-msg');
@@ -981,12 +1532,29 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
         banner.className = "mb-6 p-4 rounded-xl border text-xs font-semibold flex items-start justify-between bg-[#F4F6FF] border-[#1F3FD0]/30 text-[#1F3FD0]";
         icon.textContent = "ℹ️";
       }
-
       banner.classList.remove('hidden');
     }
 
-    function dismissAlert() {
-      document.getElementById('alert-banner').classList.add('hidden');
+    function dismissAlert() { document.getElementById('alert-banner').classList.add('hidden'); }
+
+    // RFC 5545 Byte-Safe Line Folder
+    function foldLine(line) {
+      const encoder = new TextEncoder();
+      if (encoder.encode(line).length <= 75) return line;
+      let out = [];
+      let current = "";
+      let maxBytes = 75;
+      for (const ch of line) {
+        if (encoder.encode(current + ch).length > maxBytes) {
+          out.push(out.length === 0 ? current : " " + current);
+          current = ch;
+          maxBytes = 74;
+        } else {
+          current += ch;
+        }
+      }
+      if (current) out.push(out.length === 0 ? current : " " + current);
+      return out.join("\r\n");
     }
 
     // RFC 5545 Compliant .ICS Exporter
@@ -1020,8 +1588,9 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
         const dtClean = ev.date.replace(/-/g, '');
 
         if (ev.isAllDay || !ev.startTime) {
+          const nextClean = nextIsoDate(ev.date).replace(/-/g, '');
           lines.push(`DTSTART;VALUE=DATE:${dtClean}`);
-          lines.push(`DTEND;VALUE=DATE:${dtClean}`);
+          lines.push(`DTEND;VALUE=DATE:${nextClean}`);
         } else {
           const stClean = ev.startTime.replace(':', '') + '00';
           const etClean = (ev.endTime ? ev.endTime.replace(':', '') : ev.startTime.replace(':', '')) + '00';
@@ -1029,13 +1598,13 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
           lines.push(`DTEND;TZID=${tz}:${dtClean}T${etClean}`);
         }
 
-        if (ev.description) lines.push(`DESCRIPTION:${ev.description.replace(/\n/g, '\\n').replace(/[,;]/g, '\\$&')}`);
+        if (ev.description) lines.push(`DESCRIPTION:${ev.description.replace(/\r?\n/g, '\\n').replace(/[,;]/g, '\\$&')}`);
         if (ev.location) lines.push(`LOCATION:${ev.location.replace(/[,;]/g, '\\$&')}`);
+        if (ev.category) lines.push(`CATEGORIES:${ev.category}`);
         lines.push("STATUS:CONFIRMED");
 
-        // Embedded Alarms
         configuredAlarms.forEach(alarm => {
-          const applies = (alarm.category === 'ALL') || 
+          const applies = (alarm.category === 'ALL') ||
                           (alarm.category === 'DDL' && (ev.category.includes('DDL') || ev.title.includes('DEADLINE'))) ||
                           (alarm.category === 'MEET' && (ev.category.includes('MEET') || ev.title.includes('MEETING'))) ||
                           (alarm.category === 'EVT' && (ev.category.includes('EVT') || ev.title.includes('EVENT'))) ||
@@ -1055,9 +1624,7 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
 
       lines.push("END:VCALENDAR");
 
-      // RFC 5545 line folding (max 75 octets)
-      const folded = lines.map(l => l.length > 75 ? l.substring(0, 75) + "\r\n " + l.substring(75) : l).join("\r\n");
-
+      const folded = lines.map(foldLine).join("\r\n") + "\r\n";
       const blob = new Blob([folded], { type: 'text/calendar;charset=utf-8' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
