@@ -475,6 +475,8 @@
     let activeTab = 'upload';
     let currentFileContent = "";
     let currentFileBase64 = null;
+    let currentFileParts = [];   // [{ mimeType, data, label }] — image overview + high-res detail crops
+    let currentImageFile = null;
     let currentFileType = "";
     let currentFileName = "";
     let extractedEvents = [];
@@ -714,6 +716,137 @@
       return btoa(binary);
     }
 
+    function canvasToJpegBase64(canvas, quality = 0.90) {
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      return dataUrl.split(',')[1];
+    }
+
+    async function loadImageSource(file) {
+      if (typeof createImageBitmap === 'function') {
+        try {
+          return await createImageBitmap(file);
+        } catch (e) {}
+      }
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = (err) => { URL.revokeObjectURL(url); reject(err); };
+        img.src = url;
+      });
+    }
+
+    async function prepareImageParts(file) {
+      const src = await loadImageSource(file);
+      const w = src.width || src.naturalWidth;
+      const h = src.height || src.naturalHeight;
+      if (!w || !h) throw new Error('Invalid image dimensions');
+
+      const parts = [];
+      const maxOverviewDim = 1800;
+      const scale = Math.min(1, maxOverviewDim / Math.max(w, h));
+      const ovW = Math.max(1, Math.round(w * scale));
+      const ovH = Math.max(1, Math.round(h * scale));
+
+      const ovCanvas = document.createElement('canvas');
+      ovCanvas.width = ovW;
+      ovCanvas.height = ovH;
+      const ovCtx = ovCanvas.getContext('2d');
+      ovCtx.fillStyle = '#FFFFFF';
+      ovCtx.fillRect(0, 0, ovW, ovH);
+      ovCtx.drawImage(src, 0, 0, ovW, ovH);
+      parts.push({
+        mimeType: 'image/jpeg',
+        data: canvasToJpegBase64(ovCanvas, 0.90),
+        label: 'Full overview image (read layout, headers, columns, and dates):'
+      });
+
+      // Generate overlapping high-resolution crops for tall or dense screenshots/tables
+      const aspect = h / w;
+      const needsVerticalCrops = aspect > 1.3 || h > 1300;
+      const needsHorizontalCrops = w > 1800 && w / h > 1.4;
+
+      if (needsVerticalCrops) {
+        const numSlices = aspect > 2.2 ? 3 : 2;
+        const overlap = 0.18;
+        const sliceRatio = (1 + overlap * (numSlices - 1)) / numSlices;
+        for (let i = 0; i < numSlices; i++) {
+          const sy = Math.max(0, Math.round(i * (1 - overlap) * sliceRatio * h));
+          const sh = Math.min(h - sy, Math.round(sliceRatio * h));
+          if (sh <= 0) continue;
+          const cropScale = Math.min(1, 1600 / Math.max(w, sh));
+          const cw = Math.max(1, Math.round(w * cropScale));
+          const ch = Math.max(1, Math.round(sh * cropScale));
+          const c = document.createElement('canvas');
+          c.width = cw;
+          c.height = ch;
+          const ctx = c.getContext('2d');
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, cw, ch);
+          ctx.drawImage(src, 0, sy, w, sh, 0, 0, cw, ch);
+          parts.push({
+            mimeType: 'image/jpeg',
+            data: canvasToJpegBase64(c, 0.92),
+            label: `High-resolution vertical crop ${i + 1} of ${numSlices} (extract every row/item visible here):`
+          });
+        }
+      } else if (needsHorizontalCrops) {
+        const numSlices = 2;
+        const overlap = 0.15;
+        const sliceRatio = (1 + overlap) / 2;
+        for (let i = 0; i < numSlices; i++) {
+          const sx = Math.max(0, Math.round(i * (1 - overlap) * sliceRatio * w));
+          const sw = Math.min(w - sx, Math.round(sliceRatio * w));
+          if (sw <= 0) continue;
+          const cropScale = Math.min(1, 1600 / Math.max(sw, h));
+          const cw = Math.max(1, Math.round(sw * cropScale));
+          const ch = Math.max(1, Math.round(h * cropScale));
+          const c = document.createElement('canvas');
+          c.width = cw;
+          c.height = ch;
+          const ctx = c.getContext('2d');
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, cw, ch);
+          ctx.drawImage(src, sx, 0, sw, h, 0, 0, cw, ch);
+          parts.push({
+            mimeType: 'image/jpeg',
+            data: canvasToJpegBase64(c, 0.92),
+            label: `High-resolution horizontal crop ${i + 1} of ${numSlices} (extract every column/cell visible here):`
+          });
+        }
+      }
+
+      if (typeof src.close === 'function') src.close();
+      return parts;
+    }
+
+    async function runFallbackOcr(file) {
+      if (!file || !window.Tesseract) return "";
+      const ocrProgress = document.getElementById('ocr-progress');
+      const ocrStatus = document.getElementById('ocr-status');
+      const ocrBar = document.getElementById('ocr-bar');
+      const ocrPct = document.getElementById('ocr-pct');
+      ocrProgress.classList.remove('hidden');
+      try {
+        const result = await Tesseract.recognize(file, 'eng', {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              const pct = Math.round(m.progress * 100);
+              ocrStatus.textContent = `Fallback OCR scanning image... (${pct}%)`;
+              ocrPct.textContent = `${pct}%`;
+              ocrBar.style.width = `${pct}%`;
+            }
+          }
+        });
+        ocrStatus.textContent = "Fallback OCR complete!";
+        setTimeout(() => ocrProgress.classList.add('hidden'), 1000);
+        return result.data.text || "";
+      } catch (err) {
+        ocrProgress.classList.add('hidden');
+        return "";
+      }
+    }
+
     async function handleFile(file) {
       currentFileName = file.name;
       currentFileType = file.type || "application/octet-stream";
@@ -738,42 +871,33 @@
       isFileProcessing = true;
       currentFileBase64 = null;
       currentFileContent = "";
+      currentFileParts = [];
+      currentImageFile = null;
 
       try {
         const arrayBuffer = await file.arrayBuffer();
 
         if (['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'].includes(ext) || file.type.startsWith('image/')) {
           currentFileType = file.type || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-          currentFileBase64 = arrayBufferToBase64(arrayBuffer);
+          currentImageFile = file;
 
           // Show image thumbnail
           const objUrl = URL.createObjectURL(file);
           imgPreview.src = objUrl;
           imgPreview.classList.remove('hidden');
 
-          const ocrProgress = document.getElementById('ocr-progress');
-          const ocrStatus = document.getElementById('ocr-status');
-          const ocrBar = document.getElementById('ocr-bar');
-          const ocrPct = document.getElementById('ocr-pct');
-          ocrProgress.classList.remove('hidden');
-
           try {
-            const result = await Tesseract.recognize(file, 'eng', {
-              logger: m => {
-                if (m.status === 'recognizing text') {
-                  const pct = Math.round(m.progress * 100);
-                  ocrStatus.textContent = `Scanning image OCR... (${pct}%)`;
-                  ocrPct.textContent = `${pct}%`;
-                  ocrBar.style.width = `${pct}%`;
-                }
-              }
-            });
-            currentFileContent = result.data.text || "";
-            ocrStatus.textContent = "Image OCR complete!";
-            setTimeout(() => ocrProgress.classList.add('hidden'), 1200);
-          } catch (err) {
-            console.warn("Tesseract client OCR deferred to Gemini Vision:", err);
-            ocrProgress.classList.add('hidden');
+            // Overview + overlapping high-res crops, so small text in tall screenshots / photos stays legible.
+            currentFileParts = await prepareImageParts(file);
+            currentFileType = 'image/jpeg';
+            currentFileBase64 = currentFileParts[0].data;
+            const crops = currentFileParts.length - 1;
+            if (crops > 0) document.getElementById('file-type-badge').textContent = `${ext.toUpperCase()} · ${crops} detail crops`;
+          } catch (prepErr) {
+            // Browser could not decode/re-encode the image: send the original bytes as-is.
+            console.warn("Image preprocessing failed, sending original image:", prepErr);
+            currentFileBase64 = arrayBufferToBase64(arrayBuffer);
+            currentFileParts = [{ mimeType: currentFileType, data: currentFileBase64, label: '' }];
           }
         } else if (ext === 'pdf') {
           currentFileType = 'application/pdf';
@@ -861,6 +985,8 @@
       fileInput.value = "";
       currentFileContent = "";
       currentFileBase64 = null;
+      currentFileParts = [];
+      currentImageFile = null;
       currentFileType = "";
       currentFileName = "";
       document.getElementById('image-preview').classList.add('hidden');
@@ -868,6 +994,19 @@
       document.getElementById('file-info').classList.add('hidden');
       document.getElementById('ocr-progress').classList.add('hidden');
       dropzone.classList.remove('hidden');
+    }
+
+    function formatEventTitle(rawName, category, code, catStyle) {
+      const cleanName = (rawName || 'Scheduled Event').trim();
+      const cat = (category || 'EVT').toUpperCase();
+      let tag = cat;
+      if (catStyle === 'none') tag = '';
+      else if (catStyle === 'full') {
+        const fullMap = { DDL: 'DEADLINE', MEET: 'MEETING', EVT: 'EVENT', FLIGHT: 'FLIGHT', HOL: 'HOLIDAY', MILE: 'MILESTONE' };
+        tag = fullMap[cat] || cat;
+      }
+      const prefix = code ? `${code} - ` : '';
+      return tag ? `${prefix}${tag} - ${cleanName}` : `${prefix}${cleanName}`;
     }
 
     // Main Extraction Dispatcher
@@ -881,18 +1020,20 @@
       let text = "";
       let fileB64ToUse = null;
       let fileMimeToUse = null;
+      let filePartsToUse = [];
 
       if (activeTab === 'paste' && pastedText) {
         text = pastedText;
-      } else if (currentFileContent || currentFileBase64) {
+      } else if (currentFileContent || currentFileBase64 || currentFileParts.length > 0) {
         text = currentFileContent.trim();
         fileB64ToUse = currentFileBase64;
         fileMimeToUse = currentFileType;
+        filePartsToUse = currentFileParts;
       } else if (pastedText) {
         text = pastedText;
       }
 
-      if (!text && !fileB64ToUse) {
+      if (!text && !fileB64ToUse && filePartsToUse.length === 0) {
         showAlert("Please upload a file/image, paste a screenshot (Ctrl+V), or paste text first!", "warning");
         return false;
       }
@@ -904,19 +1045,27 @@
       const scope = document.getElementById('scope-select').value;
 
       const extractBtn = document.getElementById('extract-btn');
-      extractBtn.innerHTML = `<span>⏳ Extracting with Gemini 3.8 Flash High...</span>`;
+      extractBtn.innerHTML = `<span>⏳ Extracting with Gemini Vision...</span>`;
       extractBtn.disabled = true;
 
       try {
-        extractedEvents = await callWixBackendExtraction(text, fileB64ToUse, fileMimeToUse, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
-        if (!isQuick) showAlert(`Successfully extracted ${extractedEvents.length} events using Gemini 3.8 Flash High!`, "success");
+        const result = await callWixBackendExtraction(text, fileB64ToUse, fileMimeToUse, filePartsToUse, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
+        extractedEvents = result.events;
+        if (!isQuick) {
+          const modelLabel = result.model || 'Gemini Flash';
+          showAlert(`Successfully extracted ${extractedEvents.length} events using ${modelLabel}!`, "success");
+        }
       } catch (backendErr) {
-        console.warn("Backend API unavailable/timeout, using multi-format client parser:", backendErr);
-        extractedEvents = parseDocumentEvents(text, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
+        console.warn("Backend API unavailable/failed, falling back to local parser:", backendErr);
+        let fallbackText = text;
+        if (!fallbackText && currentImageFile) {
+          fallbackText = await runFallbackOcr(currentImageFile);
+        }
+        extractedEvents = parseDocumentEvents(fallbackText, shortCode, catStyle, defaultTime, isAllDayDefault, scope);
         if (extractedEvents.length === 0) {
-          showAlert("Could not detect clear dates/events in this input. Check formatting or add rows manually below.", "warning");
+          showAlert(`AI extraction failed (${backendErr.message}) and no fallback events were found. Try again or add rows manually below.`, "warning");
         } else if (!isQuick) {
-          showAlert(`Extracted ${extractedEvents.length} events from your input!`, "success");
+          showAlert(`AI backend unavailable (${backendErr.message}); extracted ${extractedEvents.length} events via local fallback parser.`, "warning");
         }
       } finally {
         extractBtn.innerHTML = `<span>✨ Extract &amp; Review</span>`;
@@ -929,90 +1078,115 @@
       return true;
     }
 
-    async function callWixBackendExtraction(text, fileBase64, mimeType, code, catStyle, defaultTime, isAllDay, scope) {
-      const prompt = `You are an expert calendar extraction AI using Gemini 3.8 Flash with High thinking effort.
-Extract all calendar events, deadlines, meetings, lectures, travel flights, holidays, and milestones from this document, image, or pasted note into a valid JSON array of objects.
+    async function callWixBackendExtraction(text, fileBase64, mimeType, fileParts, code, catStyle, defaultTime, isAllDay, scope) {
+      const prompt = `Extract EVERY single calendar event, deadline, exam, lecture, workshop, meeting, flight, holiday, and milestone visible in the attached files/images or text.
+Be exhaustive: scan every table row, multi-line cell, sidebar, footnote, and detail crop without skipping any item.
+If multiple images are provided (overview + high-resolution crops), combine all visible events and deduplicate items that appear in overlapping crops.
+If a row has both a class/session and a separate deliverable/exam/holiday, output separate events for each.
 
 Rules:
-- title: string (format as: ${code ? code + ' - ' : ''}[CATEGORY] - Event Title)
-- date: string YYYY-MM-DD
-- startTime: HH:MM in 24h or null if all-day
-- endTime: HH:MM in 24h or null
-- isAllDay: boolean (true for holidays/date-only events unless it's a deadline without hour -> defaultTime ${defaultTime || '23:59'})
+- name: concise event title WITHOUT category tags or course prefixes (e.g. "Course Introduction & Marketing Fundamentals", "Quiz 1", "Midterm Exam")
+- date: start date YYYY-MM-DD
+- endDate: inclusive last date YYYY-MM-DD for multi-day events (e.g. Spring Break 2027-03-22 to 2027-03-26), or null
+- startTime: HH:MM in 24h, or null if all-day or no time given
+- endTime: HH:MM in 24h, or null
+- isAllDay: boolean (true for holidays/breaks/date-only events unless it is a deadline without a clock time -> use ${defaultTime || '23:59'})
 - category: one of [DDL, MEET, EVT, FLIGHT, HOL, MILE]
-- location: string
-- description: string
+- location: room, building, or URL if shown, else ""
+- description: useful context (deliverable details, grading weight, notes)
 
-Category style preference: ${catStyle} (short: DDL/MEET/EVT/FLIGHT/HOL/MILE; full: DEADLINE/MEETING/EVENT/FLIGHT/HOLIDAY/MILESTONE; none: omit category tag)
-Extraction scope filter: ${scope}
+Extraction scope filter: ${scope}.
+Return JSON matching {"events": [...]}.`;
 
-Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
+      const isWixHost = /(?:^|\.)zyfn\.com$/i.test(window.location.hostname || '');
+      const endpoints = isWixHost
+        ? ['/_functions/extractCalendar', 'https://www.zyfn.com/_functions/extractCalendar']
+        : ['https://www.zyfn.com/_functions/extractCalendar'];
 
-      const endpoints = ['/_functions/extractCalendar', 'https://www.zyfn.com/_functions/extractCalendar'];
       let res = null;
+      let resData = null;
       let lastErr = null;
 
-      // Only send binary inlineData for PDF & images
-      const canInline = fileBase64 && mimeType && (mimeType === 'application/pdf' || mimeType.startsWith('image/'));
+      // Build multi-part files payload if available, else legacy single file
+      let filesToSend = Array.isArray(fileParts) ? fileParts.filter(f => f && f.data && (f.mimeType === 'application/pdf' || f.mimeType.startsWith('image/'))) : [];
+      if (filesToSend.length === 0 && fileBase64 && mimeType && (mimeType === 'application/pdf' || mimeType.startsWith('image/'))) {
+        filesToSend = [{ mimeType, data: fileBase64 }];
+      }
 
       for (const ep of endpoints) {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 13000);
+          const timeoutId = setTimeout(() => controller.abort(), 60000);
           res = await fetch(ep, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               prompt: prompt,
-              text: text.substring(0, 60000),
-              fileBase64: canInline ? fileBase64 : null,
-              mimeType: canInline ? mimeType : null,
-              model: 'gemini-3.8-flash',
-              thinkingLevel: 'HIGH'
+              text: (text || '').substring(0, 120000),
+              files: filesToSend,
+              fileBase64: filesToSend[0]?.data || null,
+              mimeType: filesToSend[0]?.mimeType || null
             }),
             signal: controller.signal
           });
           clearTimeout(timeoutId);
-          if (res.ok) break;
+          try { resData = await res.json(); } catch (e) { resData = null; }
+          if (res.ok && resData && !resData.error) break;
+          lastErr = new Error(resData?.error?.message || `HTTP ${res.status}`);
         } catch (e) {
           lastErr = e;
         }
       }
 
-      if (!res || !res.ok) throw new Error("Wix backend endpoint unavailable: " + (lastErr?.message || "HTTP " + res?.status));
-
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-
-      let rawText = "";
-      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-        rawText = data.candidates[0].content.parts[0].text;
-      } else if (data.steps && data.steps.length > 0) {
-        const lastStep = data.steps[data.steps.length - 1];
-        rawText = lastStep.content?.[0]?.text || lastStep.output_text || "";
-      } else if (typeof data === 'string') {
-        rawText = data;
+      if (!res || !res.ok || !resData || resData.error) {
+        throw new Error(lastErr?.message || `Wix backend unavailable (HTTP ${res?.status || 'network'})`);
       }
 
-      if (!rawText) throw new Error("No response candidates from Gemini API");
-      const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
-      const items = Array.isArray(parsed) ? parsed : (parsed.events || [parsed]);
+      let items = Array.isArray(resData.events) ? resData.events : null;
+      if (!items) {
+        let rawText = "";
+        if (resData.candidates?.[0]?.content?.parts) {
+          rawText = resData.candidates[0].content.parts
+            .filter(p => p && typeof p.text === 'string' && !p.thought)
+            .map(p => p.text)
+            .join('')
+            .trim();
+        } else if (typeof resData === 'string') {
+          rawText = resData;
+        }
+        if (!rawText) throw new Error("No response candidates from Gemini API");
+        const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanJson);
+        items = Array.isArray(parsed) ? parsed : (parsed.events || [parsed]);
+      }
 
-      const validItems = items.filter(i => i && (i.date || i.title));
-      if (validItems.length === 0) throw new Error("Parsed response did not contain calendar items");
+      const validItems = (items || []).filter(i => i && (i.date || i.name || i.title));
+      if (validItems.length === 0) throw new Error("No calendar events detected in response");
 
-      return validItems.map(item => ({
-        id: 'ev_' + Math.random().toString(36).substr(2, 9),
-        title: item.title || "Scheduled Event",
-        date: item.date || new Date().toISOString().split('T')[0],
-        startTime: item.startTime || (isAllDay ? "" : (defaultTime || "23:59")),
-        endTime: item.endTime || item.startTime || (isAllDay ? "" : (defaultTime || "23:59")),
-        isAllDay: item.isAllDay !== undefined ? item.isAllDay : isAllDay,
-        category: item.category || 'EVT',
-        location: item.location || '',
-        description: item.description || ''
-      }));
+      return {
+        model: resData.model || 'Gemini Flash',
+        events: validItems.map(item => {
+          const cat = (item.category || 'EVT').toUpperCase();
+          const hasTime = Boolean(item.startTime);
+          const itemAllDay = item.isAllDay !== undefined
+            ? Boolean(item.isAllDay)
+            : (!hasTime && (isAllDay || cat !== 'DDL'));
+          const st = itemAllDay ? "" : (item.startTime || defaultTime || "23:59");
+          const et = itemAllDay ? "" : (item.endTime || st);
+          return {
+            id: 'ev_' + Math.random().toString(36).substr(2, 9),
+            title: item.title || formatEventTitle(item.name, cat, code, catStyle),
+            date: item.date || new Date().toISOString().split('T')[0],
+            endDate: item.endDate || null,
+            startTime: st,
+            endTime: et,
+            isAllDay: itemAllDay,
+            category: cat,
+            location: item.location || '',
+            description: item.description || ''
+          };
+        })
+      };
     }
 
     // Helper: Convert 12h time with am/pm to 24h HH:MM
@@ -1226,7 +1400,7 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
       const dtClean = ev.date.replace(/-/g, '');
       let datesParam = "";
       if (ev.isAllDay || !ev.startTime) {
-        const nextStr = nextIsoDate(ev.date).replace(/-/g, '');
+        const nextStr = nextIsoDate(ev.endDate || ev.date).replace(/-/g, '');
         datesParam = `${dtClean}/${nextStr}`;
       } else {
         const st = ev.startTime.replace(':', '') + '00';
@@ -1470,7 +1644,7 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
 
           if (ev.isAllDay || !ev.startTime) {
             payload.start = { date: ev.date };
-            payload.end = { date: nextIsoDate(ev.date) };
+            payload.end = { date: nextIsoDate(ev.endDate || ev.date) };
           } else {
             const st = ev.startTime.length === 5 ? ev.startTime + ':00' : ev.startTime;
             const etRaw = ev.endTime || ev.startTime;
@@ -1557,6 +1731,14 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
       return out.join("\r\n");
     }
 
+    function escapeIcsText(text) {
+      return String(text || '')
+        .replace(/\\/g, '\\\\')
+        .replace(/;/g, '\\;')
+        .replace(/,/g, '\\,')
+        .replace(/\r\n|\r|\n/g, '\\n');
+    }
+
     // RFC 5545 Compliant .ICS Exporter
     function downloadICS() {
       if (extractedEvents.length === 0) {
@@ -1573,7 +1755,7 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
         "PRODID:-//Zyfn DocToCalendar//EN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
-        `X-WR-CALNAME:${calName}`,
+        `X-WR-CALNAME:${escapeIcsText(calName)}`,
         `X-WR-TIMEZONE:${tz}`
       ];
 
@@ -1583,12 +1765,12 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
         lines.push("BEGIN:VEVENT");
         lines.push(`UID:${ev.id}@zyfn.com`);
         lines.push(`DTSTAMP:${now}`);
-        lines.push(`SUMMARY:${ev.title.replace(/[,;]/g, '\\$&')}`);
+        lines.push(`SUMMARY:${escapeIcsText(ev.title)}`);
 
         const dtClean = ev.date.replace(/-/g, '');
 
         if (ev.isAllDay || !ev.startTime) {
-          const nextClean = nextIsoDate(ev.date).replace(/-/g, '');
+          const nextClean = nextIsoDate(ev.endDate || ev.date).replace(/-/g, '');
           lines.push(`DTSTART;VALUE=DATE:${dtClean}`);
           lines.push(`DTEND;VALUE=DATE:${nextClean}`);
         } else {
@@ -1598,9 +1780,9 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
           lines.push(`DTEND;TZID=${tz}:${dtClean}T${etClean}`);
         }
 
-        if (ev.description) lines.push(`DESCRIPTION:${ev.description.replace(/\r?\n/g, '\\n').replace(/[,;]/g, '\\$&')}`);
-        if (ev.location) lines.push(`LOCATION:${ev.location.replace(/[,;]/g, '\\$&')}`);
-        if (ev.category) lines.push(`CATEGORIES:${ev.category}`);
+        if (ev.description) lines.push(`DESCRIPTION:${escapeIcsText(ev.description)}`);
+        if (ev.location) lines.push(`LOCATION:${escapeIcsText(ev.location)}`);
+        if (ev.category) lines.push(`CATEGORIES:${escapeIcsText(ev.category)}`);
         lines.push("STATUS:CONFIRMED");
 
         configuredAlarms.forEach(alarm => {
@@ -1613,7 +1795,7 @@ Respond with a raw JSON array of objects ONLY. No markdown, no backticks.`;
           if (applies) {
             lines.push("BEGIN:VALARM");
             lines.push("ACTION:DISPLAY");
-            lines.push(`DESCRIPTION:Reminder: ${ev.title.replace(/[,;]/g, '\\$&')}`);
+            lines.push(`DESCRIPTION:${escapeIcsText('Reminder: ' + ev.title)}`);
             lines.push(`TRIGGER:${alarm.trigger}`);
             lines.push("END:VALARM");
           }
