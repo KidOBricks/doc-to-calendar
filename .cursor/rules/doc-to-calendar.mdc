@@ -14,8 +14,9 @@ When the user asks to extract dates, deadlines, exams, meetings, itineraries, or
 2. **Format Titles**:
    `[SHORT CODE - ]CATEGORY - Event Title`
 3. **Generate RFC 5545 `.ics` File**:
-   `python scripts/generate_ics.py -i <json_file> -o <filename>.ics`
+   - Prefer `python3 scripts/generate_ics.py -i <json_file> -o <filename>.ics` (or `python` / `py -3`).
+   - **If the command runner fails or Python is unavailable**: do NOT abort—write the RFC 5545 `.ics` file directly with the file-writing tool (or output a fenced ```` ```ics ```` block + Google Calendar `TEMPLATE` links if read-only).
 4. **Optional Direct Google Calendar Push**:
-   - Inspect calendars: `python scripts/push_to_gcalendar.py --list-calendars`
-   - Push with per-category colors: `python scripts/push_to_gcalendar.py -i <json_file> --cal "<id_or_name>" --color-map "DDL=11,EXAM=4,LEC=9,HOL=2"`
+   - Inspect calendars: `python3 scripts/push_to_gcalendar.py --list-calendars`
+   - Push with per-category colors: `python3 scripts/push_to_gcalendar.py -i <json_file> --cal "<id_or_name>" --color-map "DDL=11,EXAM=4,LEC=9,HOL=2"`
 5. **Deliver Preview & Links**: Display the Markdown staging table, link any `.ics` file, and share Google Calendar event links.

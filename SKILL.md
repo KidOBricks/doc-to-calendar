@@ -153,12 +153,24 @@ Display a clear Markdown preview table before finalizing:
 
 ## Step 5: Generate `.ics` and/or Push to Google Calendar
 
-Resolve the skill's `scripts/` directory dynamically (where `SKILL.md` lives, e.g., `~/.gemini/config/plugins/doc-to-calendar/skills/doc-to-calendar/scripts/`, `~/.claude/skills/doc-to-calendar/scripts/`, or workspace `.agents/skills/doc-to-calendar/scripts/`).
+Resolve the skill's `scripts/` directory dynamically (where `SKILL.md` lives, e.g., `~/.codex/skills/doc-to-calendar/scripts/`, `$CODEX_HOME/skills/doc-to-calendar/scripts/`, `~/.gemini/config/plugins/doc-to-calendar/skills/doc-to-calendar/scripts/`, `~/.claude/skills/doc-to-calendar/scripts/`, `~/.cursor/skills/doc-to-calendar/scripts/`, or workspace `.agents/skills/doc-to-calendar/scripts/`).
 
-### 5A. Generate RFC 5545 `.ics` File
+### 5A. Generate RFC 5545 `.ics` File (With Automatic No-Runner Fallbacks)
+
+1. **Primary (when command runner + Python are available):**
+   Run with `python3` (or `python`, or `py -3` on Windows):
 ```bash
-python "<skill_dir>/scripts/generate_ics.py" -i "staged_events.json" -o "<chosen_filename>.ics"
+python3 "<skill_dir>/scripts/generate_ics.py" -i "staged_events.json" -o "<chosen_filename>.ics"
 ```
+
+2. **Fallback 1 (if the local command runner fails to start, shell is disabled, Python is unavailable, or `generate_ics.py` cannot be reached):**
+   **NEVER stop or tell the user no `.ics` file could be created.** An `.ics` file is plain UTF-8 text — generate the RFC 5545 `.ics` content yourself and write `<chosen_filename>.ics` directly using your file-writing tool (`write_to_file` / file creation tool), following these RFC 5545 rules (see `references/ics_spec_and_examples.md`):
+   - `VCALENDAR` header: `VERSION:2.0`, `PRODID:-//DocToCalendar//Agent//EN`, `CALSCALE:GREGORIAN`, `METHOD:PUBLISH`, `X-WR-CALNAME:<name>`, `X-WR-TIMEZONE:<tz>`.
+   - Each `VEVENT`: unique `UID:<uuid>@doctocalendar`, UTC `DTSTAMP:YYYYMMDDTHHMMSSZ`, `SUMMARY`, `DTSTART;TZID=<tz>:YYYYMMDDTHHMMSS` + `DTEND;TZID=<tz>:YYYYMMDDTHHMMSS` (or `DTSTART;VALUE=DATE:YYYYMMDD` + exclusive next-day `DTEND;VALUE=DATE:YYYYMMDD` for all-day), `DESCRIPTION`, `LOCATION`, `CATEGORIES`, `STATUS:CONFIRMED`, `TRANSP:OPAQUE`, and any `VALARM` blocks (`ACTION:DISPLAY`, `TRIGGER:-P1D` / `-PT30M`).
+   - Escape `\` → `\\`, `;` → `\;`, `,` → `\,`, newlines → `\n` in text fields, and fold any line over 75 UTF-8 bytes onto the next line with a single leading space.
+
+3. **Fallback 2 (if both the command runner AND file-writing tools fail / are read-only):**
+   Output the complete, valid RFC 5545 `.ics` content directly in chat inside a fenced ```` ```ics ```` code block (so the user can save it as `<chosen_filename>.ics`), **plus** clickable `https://calendar.google.com/calendar/render?action=TEMPLATE&text=...&dates=...&ctz=...` quick-add links for each event.
 
 #### Staged JSON Schema:
 ```json
@@ -199,11 +211,11 @@ python "<skill_dir>/scripts/generate_ics.py" -i "staged_events.json" -o "<chosen
 2. Before writing to an existing calendar, inspect relevant dates with `gcalendar readonly events --cal "<cal_id>" --start ... --end ...` if checking for duplicates or conflicts.
 3. Run the bundled Google Calendar pusher script (supports calendar **ID** or exact **Calendar Name**, plus `--color-map` with numeric IDs or color names like `DDL=Tomato,EXAM=4,LEC=Blueberry`):
 ```bash
-python "<skill_dir>/scripts/push_to_gcalendar.py" -i "staged_events.json" --cal "<calendar_id_or_name>" --color-map "DDL=11,EXAM=4,LEC=9,HOL=2"
+python3 "<skill_dir>/scripts/push_to_gcalendar.py" -i "staged_events.json" --cal "<calendar_id_or_name>" --color-map "DDL=11,EXAM=4,LEC=9,HOL=2"
 ```
 *(Add `--dry-run` first if verifying timestamps/colors, or `--account <email>` if multiple accounts are connected.)*
 
 ### Final Delivery
-- Provide a clickable `file:///` link to any generated `.ics` file.
+- Provide a clickable `file:///` link to any generated `.ics` file (or the ready-to-save ```` ```ics ```` block + Google Calendar quick-add links if file writing was blocked).
 - Print every created Google Calendar event's clickable `Link:` URL and confirm target calendar + color assignments.
 - Clean up any temporary intermediate JSON files if created in scratch directories unless requested otherwise.

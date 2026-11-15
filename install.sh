@@ -51,8 +51,8 @@ cp -r "$SOURCE_DIR/"* "$CLAUDE_DIR/"
 echo "  ✅ Installed for Claude Code ($CLAUDE_DIR)"
 INSTALLED=$((INSTALLED + 1))
 
-# 3. OpenAI Codex (~/.codex/skills/doc-to-calendar)
-CODEX_DIR="$HOME/.codex/skills/doc-to-calendar"
+# 3. OpenAI Codex (${CODEX_HOME:-$HOME/.codex}/skills/doc-to-calendar)
+CODEX_DIR="${CODEX_HOME:-$HOME/.codex}/skills/doc-to-calendar"
 mkdir -p "$CODEX_DIR"
 cp -r "$SOURCE_DIR/"* "$CODEX_DIR/"
 echo "  ✅ Installed for OpenAI Codex ($CODEX_DIR)"

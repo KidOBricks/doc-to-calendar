@@ -51,8 +51,9 @@ try {
     Write-Host "  ✅ Installed for Claude Code ($ClaudeSkillDir)" -ForegroundColor Green
     $InstalledCount++
 
-    # 3. OpenAI Codex (~/.codex/skills/doc-to-calendar)
-    $CodexSkillDir = Join-Path $HOME ".codex\skills\doc-to-calendar"
+    # 3. OpenAI Codex ($env:CODEX_HOME or ~/.codex/skills/doc-to-calendar)
+    $CodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
+    $CodexSkillDir = Join-Path $CodexHome "skills\doc-to-calendar"
     New-Item -ItemType Directory -Force -Path $CodexSkillDir | Out-Null
     Copy-Item -Path "$SourceDir\*" -Destination $CodexSkillDir -Recurse -Force
     Write-Host "  ✅ Installed for OpenAI Codex ($CodexSkillDir)" -ForegroundColor Green
